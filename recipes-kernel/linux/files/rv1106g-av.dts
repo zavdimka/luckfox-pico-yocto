@@ -1,0 +1,270 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2022 Rockchip Electronics Co., Ltd.
+ */
+
+/dts-v1/;
+#include "rv1106.dtsi"
+#include "rv1106-luckfox-pico-ultra-ipc.dtsi"
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/display/media-bus-format.h>
+
+/ {
+	model = "Luckfox Pico Ultra W";
+	compatible = "rockchip,rv1103g-38x38-ipc-v10", "rockchip,rv1106g3";
+
+	restart-poweroff {
+		compatible = "restart-poweroff";
+	};
+
+	leds: leds {
+                compatible = "gpio-leds";
+                work_led: work{
+                        gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;
+                        linux,default-trigger = "activity";
+                        default-state = "on";
+                };
+        };
+
+		cc33xx_en_reg: fixedregulator@1 {
+            compatible = "regulator-fixed";
+            regulator-name = "cc33xx-en-regulator";
+            regulator-min-microvolt = <1800000>;
+            regulator-max-microvolt = <1800000>;
+            startup-delay-us = <1000>;  /* HW init grace period */
+            gpio = <&gpio3 RK_PC4 0>;
+            enable-active-high;
+            regulator-always-on; /* Keeps the  reset pin de-asserted (high) if regulator is not in use */
+			status = "okay";
+	    };
+
+/*
+	sdio_pwrseq: sdio-pwrseq {
+				compatible = "mmc-pwrseq-simple";
+				pinctrl-names = "default";
+				//reset-gpios = <&gpio0 RK_PA3 GPIO_ACTIVE_LOW>;
+				reset-gpios = <&gpio3 RK_PC4 GPIO_ACTIVE_LOW>;
+		};
+*/
+
+	wireless_bluetooth: wireless-bluetooth {
+	compatible = "bluetooth-platdata";
+	uart_rts_gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
+	pinctrl-names = "default", "rts_gpio";
+	pinctrl-0 = <&uart1m0_rtsn>;
+	pinctrl-1 = <&uart1_gpios>;
+	BT,wake_gpio     = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+	BT,wake_host_irq = <&gpio0 RK_PA2 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+	};
+};
+
+
+/**********CRU**********/
+//&cru {
+//	assigned-clocks =
+//		<&cru PLL_GPLL>, <&cru PLL_CPLL>,
+//		<&cru ARMCLK>,
+//		<&cru ACLK_PERI_ROOT>, <&cru HCLK_PERI_ROOT>,
+//		<&cru PCLK_PERI_ROOT>, <&cru ACLK_BUS_ROOT>,
+//		<&cru PCLK_TOP_ROOT>, <&cru PCLK_PMU_ROOT>,
+//		<&cru HCLK_PMU_ROOT>, <&cru CLK_500M_SRC>;
+//	assigned-clock-rates =
+//		<1188000000>, <700000000>,
+//		<1104000000>,
+//		<400000000>, <200000000>,
+//		<100000000>, <300000000>,
+//		<100000000>, <100000000>,
+//		<200000000>, <700000000>;
+//};
+
+/**********NPU**********/
+//&npu {
+//	assigned-clock-rates = <700000000>;
+//};
+
+&wdt{
+	status = "okay";
+};
+
+/**********EMMC**********/
+&emmc {
+	bus-width = <8>;
+	cap-mmc-highspeed;
+	non-removable;
+	mmc-hs200-1_8v;
+	rockchip,default-sample-phase = <90>;
+	no-sdio;
+	no-sd;
+	memory-region-ecsd = <&mmc_ecsd>;
+	post-power-on-delay-ms = <0>;
+	status = "okay";
+};
+
+&fiq_debugger {
+	rockchip,irq-mode-enable = <1>;
+	status = "okay";
+};
+
+/**********SDIO-WIFI**********/
+&sdmmc {
+	max-frequency = <50000000>;
+	vmmc-supply = <&cc33xx_en_reg>;
+	bus-width = <4>;
+	cap-sd-highspeed;
+	cap-sdio-irq;
+	keep-power-in-suspend;
+	non-removable;
+	rockchip,default-sample-phase = <90>;
+	// no-sd;
+	// no-mmc;
+	supports-sdio;
+	//mmc-pwrseq = <&sdio_pwrseq>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_bus4 &sdmmc0_det>;
+	status = "okay";
+	wlcore: wlcore@0 {
+               compatible = "ti,cc33xx";
+               reg = <2>;
+               //interrupt-parent = <&gpio0>;
+               //interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
+               //irq-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+     };
+};
+
+&pinctrl{
+	sdmmc0{
+		sdmmc0_det: sdmmc0-det {
+			rockchip,pins =
+				/* sdmmc0_det */
+				<3 RK_PA1 1 &pcfg_pull_down>;
+		};
+  };
+};
+
+
+/**********ETH**********/
+&gmac {
+	status = "okay";
+};
+
+/**********USB**********/
+&usbdrd_dwc3 {
+	status = "okay";
+	dr_mode = "peripheral";
+  //dr_mode = "host";
+};
+
+/**********RTC**********/
+&rtc {
+	status = "okay";
+};
+
+/**********BT**********/
+/*
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1m0_xfer &uart1m0_ctsn &uart1m0_rtsn>;
+	uart-has-rtscts;
+	status = "okay";
+};
+*/
+/**********BT**********/
+&uart1 {
+        status = "okay";
+        pinctrl-names = "default";
+        pinctrl-0 = <&uart1m0_xfer &uart1m0_ctsn>;
+};
+
+&pinctrl {
+  wireless-bluetooth {
+    uart1_gpios: uart1-gpios {
+      rockchip,pins = <0 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
+    };
+  };
+};
+
+/**********SPI**********/
+&spi0 {
+	status = "disabled";
+};
+
+&panel{
+	status = "disabled";
+};
+
+&backlight{
+	status = "disabled";
+};
+
+&csi2_dphy_hw {
+	status = "disabled";
+};
+
+&csi2_dphy0 {
+	status = "disabled";
+};
+
+&i2c4 {
+	status = "disabled";
+};
+
+&mipi0_csi2 {
+	status = "disabled";
+};
+
+&rkcif_mipi_lvds {
+	status = "disabled";
+};
+
+&rkcif_mipi_lvds_sditf {
+	status = "disabled";
+};
+
+&rkisp {
+	status = "disabled";
+};
+
+&rkisp_vir0 {
+	status = "disabled";
+};
+
+&pwm1 {
+	status = "disabled";
+};
+
+&display_subsystem {
+	status = "disabled";
+};
+
+&rgb {
+	status = "disabled";
+};
+
+&rgb_in_vop {
+	status = "disabled";
+};
+
+&route_rgb {
+	status = "disabled";
+};
+
+&vop {
+	status = "disabled";
+};
+
+&i2c3 { 
+	status = "disabled";
+};
+
+&csi2_dphy_hw {
+	status = "disabled";
+};
+
+&csi2_dphy0 {
+	status = "disabled";
+};
+
+&mipi0_csi2 {
+	status = "disabled";
+};

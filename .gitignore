@@ -1,0 +1,21 @@
+# Yocto build artifacts
+build/
+tmp/
+sstate-cache/
+downloads/
+cache/
+
+# Python bytecode
+*.pyc
+__pycache__/
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

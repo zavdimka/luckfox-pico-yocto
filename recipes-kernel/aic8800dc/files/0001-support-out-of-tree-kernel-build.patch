@@ -1,0 +1,22 @@
+Support out-of-tree kernel build for Yocto
+
+Remove strip and copy commands that may not be available or needed.
+Yocto's module class handles module installation separately.
+
+Upstream-Status: Inappropriate [OE-specific]
+
+Signed-off-by: Luckfox Yocto <yocto@luckfox.com>
+
+--- Makefile.orig	2026-01-30 21:08:17.428631043 -0300
++++ Makefile.new	2026-01-30 21:08:27.255007996 -0300
+@@ -59,10 +59,6 @@
+ all: modules
+ modules:
+ 	make -C $(KDIR) M=$(shell pwd) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
+-	$(CROSS_COMPILE)strip --strip-debug $(shell pwd)/*/*.ko
+-	cp $(shell pwd)/aic8800_fdrv/aic8800_fdrv.ko $(M_OUT_DIR)
+-	cp $(shell pwd)/aic8800_btlpm/aic8800_btlpm.ko $(M_OUT_DIR)
+-	cp $(shell pwd)/aic8800_bsp/aic8800_bsp.ko $(M_OUT_DIR)
+ 	cp -r $(shell pwd)/aic8800dc_fw $(M_OUT_DIR)
+ 
+ 

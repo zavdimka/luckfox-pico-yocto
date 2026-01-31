@@ -1,0 +1,385 @@
+From ef31d0a5e369701d1937947c2a2ca3e61fa6c5dc Mon Sep 17 00:00:00 2001
+From: zavdimka <zavdimka@gmail.com>
+Date: Fri, 30 Jan 2026 10:31:35 -0300
+Subject: [PATCH] Luckfox SDK modifications for RV1106
+
+This patch includes all SDK modifications to U-Boot:
+1. Custom boot partition support via part_boot env variable
+2. Watchdog timer support and commands (cmd/wdt.c)
+3. Hex number support in test command
+4. Extended environment variable list (part_boot, bootcmd, active_slot, counter)
+5. Disabled watchdog-based sysreset (causes build issues in some configs)
+6. Watchdog device tree enablement
+
+Upstream-Status: Pending
+Signed-off-by: Luckfox SDK <sdk@luckfox.com>
+---
+ arch/arm/dts/rv1106-evb.dts              |   4 +
+ arch/arm/mach-rockchip/fit.c             |   6 +
+ cmd/Kconfig                              |   6 +
+ cmd/Makefile                             |   1 +
+ cmd/test.c                               |  32 ++--
+ cmd/wdt.c                                | 174 ++++++++++++++++++
+ configs/luckfox_rv1106_uboot_defconfig   |  11 +-
+ drivers/sysreset/sysreset_watchdog.c     |   6 +-
+ 8 files changed, 224 insertions(+), 16 deletions(-)
+ create mode 100644 cmd/wdt.c
+
+diff --git a/arch/arm/dts/rv1106-evb.dts b/arch/arm/dts/rv1106-evb.dts
+index 06a03d332..f050aa562 100644
+--- a/arch/arm/dts/rv1106-evb.dts
++++ b/arch/arm/dts/rv1106-evb.dts
+@@ -34,3 +34,7 @@
+ 	u-boot,dm-spl;
+ 	status = "okay";
+ };
++
++&wdt{
++	status = "okay";
++};
+diff --git a/arch/arm/mach-rockchip/fit.c b/arch/arm/mach-rockchip/fit.c
+index 7c5681a02..a98c79cb1 100644
+--- a/arch/arm/mach-rockchip/fit.c
++++ b/arch/arm/mach-rockchip/fit.c
+@@ -150,6 +150,12 @@ static void *fit_get_blob(struct blk_desc *dev_desc,
+ 	if (rockchip_get_boot_mode() == BOOT_MODE_RECOVERY)
+ 		part_name = PART_RECOVERY;
+ #endif
++	char *alt_part = env_get("part_boot");
++	if (alt_part) {
++		part_name = alt_part;
++	}
++
++	printf("Boot partition is %s\n", part_name);
+ 
+ 	if (part_get_info_by_name(dev_desc, part_name, &part) < 0) {
+ 		FIT_I("No %s partition\n", part_name);
+diff --git a/cmd/Kconfig b/cmd/Kconfig
+index 5b359ff84..e70af3e8e 100644
+--- a/cmd/Kconfig
++++ b/cmd/Kconfig
+@@ -1059,6 +1059,12 @@ config CMD_USB_MASS_STORAGE
+ 	help
+ 	  USB mass storage support
+ 
++config CMD_WDT
++	bool "wdt"
++	depends on WDT
++	help
++	  This provides commands to control the watchdog timer devices.
++
+ endmenu
+ 
+ 
+diff --git a/cmd/Makefile b/cmd/Makefile
+index 9a2d5f89d..a3f84d604 100644
+--- a/cmd/Makefile
++++ b/cmd/Makefile
+@@ -149,6 +149,7 @@ obj-$(CONFIG_CMD_UNIVERSE) += universe.o
+ obj-$(CONFIG_CMD_UNZIP) += unzip.o
+ obj-$(CONFIG_CMD_LZMADEC) += lzmadec.o
+ obj-$(CONFIG_CMD_SCRIPT_UPDATE) += script_update.o
++obj-$(CONFIG_CMD_WDT) += wdt.o
+ obj-$(CONFIG_CMD_UFS) += ufs.o
+ obj-$(CONFIG_CMD_USB) += usb.o disk.o
+ obj-$(CONFIG_CMD_FASTBOOT) += fastboot.o
+diff --git a/cmd/test.c b/cmd/test.c
+index 7285f7546..e31f4052a 100644
+--- a/cmd/test.c
++++ b/cmd/test.c
+@@ -51,6 +51,14 @@ const struct {
+ 	{0, "-e", OP_FILE_EXISTS, 4},
+ };
+ 
++static int get_number(const char *s)
++{
++    /* Check if the string starts with 0x or 0X for hex */
++    if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
++        return simple_strtoul(s, NULL, 16);
++    return simple_strtoul(s, NULL, 10);
++}
++
+ static int do_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+ {
+ 	char * const *ap;
+@@ -114,28 +122,22 @@ static int do_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+ 			expr = strcmp(ap[0], ap[2]) > 0;
+ 			break;
+ 		case OP_INT_EQ:
+-			expr = simple_strtol(ap[0], NULL, 10) ==
+-					simple_strtol(ap[2], NULL, 10);
++			expr = get_number(ap[0]) == get_number(ap[2]);
+ 			break;
+ 		case OP_INT_NEQ:
+-			expr = simple_strtol(ap[0], NULL, 10) !=
+-					simple_strtol(ap[2], NULL, 10);
++			expr = get_number(ap[0]) !=	get_number(ap[2]);
+ 			break;
+ 		case OP_INT_LT:
+-			expr = simple_strtol(ap[0], NULL, 10) <
+-					simple_strtol(ap[2], NULL, 10);
++			expr = get_number(ap[0]) < get_number(ap[2]);
+ 			break;
+ 		case OP_INT_LE:
+-			expr = simple_strtol(ap[0], NULL, 10) <=
+-					simple_strtol(ap[2], NULL, 10);
++			expr = get_number(ap[0]) <=	get_number(ap[2]);
+ 			break;
+ 		case OP_INT_GT:
+-			expr = simple_strtol(ap[0], NULL, 10) >
+-					simple_strtol(ap[2], NULL, 10);
++			expr = get_number(ap[0]) > get_number(ap[2]);
+ 			break;
+ 		case OP_INT_GE:
+-			expr = simple_strtol(ap[0], NULL, 10) >=
+-					simple_strtol(ap[2], NULL, 10);
++			expr = get_number(ap[0]) >= get_number(ap[2]);
+ 			break;
+ 		case OP_FILE_EXISTS:
+ 			expr = file_exists(ap[1], ap[2], ap[3], FS_TYPE_ANY);
+@@ -144,10 +146,16 @@ static int do_test(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+ 
+ 		switch (op) {
+ 		case OP_OR:
++			if (last_binop == OP_OR) {
++				expr = last_expr || expr;
++			}
+ 			last_expr = expr;
+ 			last_binop = OP_OR;
+ 			break;
+ 		case OP_AND:
++			if (last_binop == OP_AND) {
++				expr = last_expr && expr;
++			}
+ 			last_expr = expr;
+ 			last_binop = OP_AND;
+ 			break;
+diff --git a/cmd/wdt.c b/cmd/wdt.c
+new file mode 100644
+index 000000000..6cc802c0e
+--- /dev/null
++++ b/cmd/wdt.c
+@@ -0,0 +1,174 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Watchdog commands
++ *
++ * Copyright (c) 2019 Michael Walle <michael@walle.cc>
++ */
++
++ #include <command.h>
++ #include <dm.h>
++ #include <wdt.h>
++ 
++ static struct udevice *currdev;
++ 
++ static int do_wdt_list(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++ {
++     struct udevice *dev;
++     struct uclass *uc;
++     int ret;
++ 
++     ret = uclass_get(UCLASS_WDT, &uc);
++     if (ret)
++         return CMD_RET_FAILURE;
++ 
++     uclass_foreach_dev(dev, uc)
++         printf("%s (%s)\n", dev->name, dev->driver->name);
++ 
++     return CMD_RET_SUCCESS;
++ }
++ 
++ static int do_wdt_dev(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++ {
++     int ret;
++ 
++     if (argc > 1) {
++         ret = uclass_get_device_by_name(UCLASS_WDT, argv[1], &currdev);
++         if (ret) {
++             printf("Can't get the watchdog timer: %s\n", argv[1]);
++             return CMD_RET_FAILURE;
++         }
++     } else {
++         if (!currdev) {
++             printf("No watchdog timer device set!\n");
++             return CMD_RET_FAILURE;
++         }
++         printf("dev: %s\n", currdev->name);
++     }
++ 
++     return CMD_RET_SUCCESS;
++ }
++ 
++ static int check_currdev(void)
++ {
++     if (!currdev) {
++         printf("No device set, use 'wdt dev' first\n");
++         return CMD_RET_FAILURE;
++     }
++     return 0;
++ }
++ 
++ static int do_wdt_start(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++ {
++     int ret;
++     u64 timeout;
++     ulong flags = 0;
++ 
++     if (argc < 2)
++         return CMD_RET_USAGE;
++ 
++     ret = check_currdev();
++     if (ret)
++         return ret;
++ 
++     timeout = simple_strtoull(argv[1], NULL, 0);
++     if (argc > 2)
++         flags = simple_strtoul(argv[2], NULL, 0);
++ 
++     ret = wdt_start(currdev, timeout, flags);
++     if (ret == -ENOSYS) {
++         printf("Starting watchdog timer not supported.\n");
++         return CMD_RET_FAILURE;
++     } else if (ret) {
++         printf("Starting watchdog timer failed (%d)\n", ret);
++         return CMD_RET_FAILURE;
++     }
++ 
++     return CMD_RET_SUCCESS;
++ }
++ 
++ static int do_wdt_stop(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++ {
++     int ret;
++ 
++     ret = check_currdev();
++     if (ret)
++         return ret;
++ 
++     ret = wdt_stop(currdev);
++     if (ret == -ENOSYS) {
++         printf("Stopping watchdog timer not supported.\n");
++         return CMD_RET_FAILURE;
++     } else if (ret) {
++         printf("Stopping watchdog timer failed (%d)\n", ret);
++         return CMD_RET_FAILURE;
++     }
++ 
++     return CMD_RET_SUCCESS;
++ }
++ 
++ static int do_wdt_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++ {
++     int ret;
++ 
++     ret = check_currdev();
++     if (ret)
++         return ret;
++ 
++     ret = wdt_reset(currdev);
++     if (ret == -ENOSYS) {
++         printf("Resetting watchdog timer not supported.\n");
++         return CMD_RET_FAILURE;
++     } else if (ret) {
++         printf("Resetting watchdog timer failed (%d)\n", ret);
++         return CMD_RET_FAILURE;
++     }
++ 
++     return CMD_RET_SUCCESS;
++ }
++ 
++ static int do_wdt_expire(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
++ {
++     int ret;
++     ulong flags = 0;
++ 
++     ret = check_currdev();
++     if (ret)
++         return ret;
++ 
++     if (argc > 1)
++         flags = simple_strtoul(argv[1], NULL, 0);
++ 
++     ret = wdt_expire_now(currdev, flags);
++     if (ret == -ENOSYS) {
++         printf("Expiring watchdog timer not supported.\n");
++         return CMD_RET_FAILURE;
++     } else if (ret) {
++         printf("Expiring watchdog timer failed (%d)\n", ret);
++         return CMD_RET_FAILURE;
++     }
++ 
++     return CMD_RET_SUCCESS;
++ }
++ 
++//  U_BOOT_LONGHELP(wdt,
++//      "list - list watchdog devices\n"
++//      "wdt dev [<name>] - get/set current watchdog device\n"
++//      "wdt start <timeout ms> [flags] - start watchdog timer\n"
++//      "wdt stop - stop watchdog timer\n"
++//      "wdt reset - reset watchdog timer\n"
++//      "wdt expire [flags] - expire watchdog timer immediately\n");
++ 
++//  U_BOOT_CMD_WITH_SUBCMDS(wdt, "Watchdog sub-system", wdt_help_text,
++//      U_BOOT_SUBCMD_MKENT(list, 1, 1, do_wdt_list),
++//      U_BOOT_SUBCMD_MKENT(dev, 2, 1, do_wdt_dev),
++//      U_BOOT_SUBCMD_MKENT(start, 3, 1, do_wdt_start),
++//      U_BOOT_SUBCMD_MKENT(stop, 1, 1, do_wdt_stop),
++//      U_BOOT_SUBCMD_MKENT(reset, 1, 1, do_wdt_reset),
++//      U_BOOT_SUBCMD_MKENT(expire, 2, 1, do_wdt_expire));
++
++U_BOOT_CMD( wdtlist, 0, 0, do_wdt_list, "wdt list", "23"  );
++U_BOOT_CMD( wdtdev, 1, 0, do_wdt_dev, "wdt dev", "23"  );
++U_BOOT_CMD( wdtstart, 2, 0, do_wdt_start, "wdt start", "23"  );
++U_BOOT_CMD( wdtstop, 0, 0, do_wdt_stop, "wdt stop", "23"  );
++U_BOOT_CMD( wdtreset, 0, 0, do_wdt_reset, "wdt reset", "23"  );
++U_BOOT_CMD( wdtexpire, 1, 0, do_wdt_expire, "wdt expire", "23"  );
+\ No newline at end of file
+diff --git a/configs/luckfox_rv1106_uboot_defconfig b/configs/luckfox_rv1106_uboot_defconfig
+index b02e74e0c..17549d6d2 100644
+--- a/configs/luckfox_rv1106_uboot_defconfig
++++ b/configs/luckfox_rv1106_uboot_defconfig
+@@ -79,7 +79,7 @@ CONFIG_OF_LIVE=y
+ CONFIG_OF_SPL_REMOVE_PROPS="interrupt-parent assigned-clocks assigned-clock-rates assigned-clock-parents"
+ CONFIG_OF_U_BOOT_REMOVE_PROPS="interrupt-parent"
+ CONFIG_ENVF=y
+-CONFIG_ENVF_LIST="blkdevparts mtdparts sys_bootargs app reserved ipaddr serverip netmask gatewayip ethaddr"
++CONFIG_ENVF_LIST="blkdevparts mtdparts sys_bootargs app reserved ipaddr serverip netmask gatewayip ethaddr part_boot bootcmd active_slot counter"
+ CONFIG_REGMAP=y
+ CONFIG_SPL_REGMAP=y
+ CONFIG_SYSCON=y
+@@ -142,3 +142,12 @@ CONFIG_SPL_LZMA=y
+ CONFIG_SPL_GZIP=y
+ CONFIG_ERRNO_STR=y
+ # CONFIG_EFI_LOADER is not set
++
++CONFIG_ENV_PARTITION=y
++CONFIG_SPL_ENV_PARTITION=y
++CONFIG_CMD_SETEXPR=y
++
++CONFIG_WDT=y
++CONFIG_ROCKCHIP_WATCHDOG=y
++CONFIG_SYSRESET_WATCHDOG=y
++CONFIG_CMD_WDT=y
+\ No newline at end of file
+diff --git a/drivers/sysreset/sysreset_watchdog.c b/drivers/sysreset/sysreset_watchdog.c
+index ab250aea2..56fb466e6 100644
+--- a/drivers/sysreset/sysreset_watchdog.c
++++ b/drivers/sysreset/sysreset_watchdog.c
+@@ -16,10 +16,10 @@ struct wdt_reboot_priv {
+ 
+ static int wdt_reboot_request(struct udevice *dev, enum sysreset_t type)
+ {
+-	struct wdt_reboot_priv *priv = dev_get_priv(dev);
+-	int ret;
++	//struct wdt_reboot_priv *priv = dev_get_priv(dev);
++	int ret=0;
+ 
+-	ret = wdt_expire_now(priv->wdt, 0);
++	//ret = wdt_expire_now(priv->wdt, 0);
+ 	if (ret)
+ 		return ret;
+ 
+-- 
+2.34.1
+

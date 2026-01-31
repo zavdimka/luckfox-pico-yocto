@@ -1,0 +1,94 @@
+SUMMARY = "Luckfox Pico RV1106 Linux kernel"
+DESCRIPTION = "Linux 5.10.160 with Luckfox RV1106 defconfig and DTS"
+LICENSE = "GPL-2.0-only"
+LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
+
+PV = "5.10.160"
+PR = "r0"
+
+SRC_URI = " \
+    git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main \
+    file://rv1106g-av.dts \
+    file://sdk-kernel.config \
+    file://rv1106-bt.config \
+    file://luckfox_rv1106-wwan-ndis-ppp.config \
+"
+
+SRCREV = "${AUTOREV}"
+S = "${WORKDIR}/git/sysdrv/source/kernel"
+# Use separate build directory - kernel class requires it
+# B defaults to ${WORKDIR}/build which is fine
+
+# Override shared kernel source location
+STAGING_KERNEL_DIR = "${WORKDIR}/git/sysdrv/source/kernel"
+
+inherit kernel luckfox-ext-toolchain
+
+DEPENDS += "bc-native"
+
+KERNEL_IMAGETYPE = "Image"
+KERNEL_DEVICETREE = "rv1106g-av.dtb"
+
+KBUILD_DEFCONFIG = "rv1106_defconfig"
+KERNEL_CONFIG_FRAGMENTS += "${WORKDIR}/sources-unpack/sdk-kernel.config ${WORKDIR}/sources-unpack/rv1106-bt.config ${WORKDIR}/sources-unpack/luckfox_rv1106-wwan-ndis-ppp.config"
+
+COMPATIBLE_MACHINE = "luckfox-pico"
+
+# Skip buildpaths QA check - external toolchain may embed TMPDIR paths
+INSANE_SKIP:kernel-dbg += "buildpaths"
+
+# Override do_configure to use external Rockchip toolchain
+do_configure() {
+    # Use toolchain from SDK directly
+    export PATH="${EXTERNAL_TOOLCHAIN_BIN}:$PATH"
+    export CROSS_COMPILE="${EXTERNAL_TOOLCHAIN_PREFIX}"
+    export ARCH="arm"
+    
+    # Copy custom DTS file to kernel source tree
+    if [ -f "${WORKDIR}/sources-unpack/rv1106g-av.dts" ]; then
+        cp -f ${WORKDIR}/sources-unpack/rv1106g-av.dts ${S}/arch/arm/boot/dts/
+    fi
+    
+    # Run defconfig with out-of-tree build
+    make -C ${S} O=${B} ${KBUILD_DEFCONFIG}
+    
+    # Merge config fragments if any
+    if [ -n "${KERNEL_CONFIG_FRAGMENTS}" ]; then
+        for fragment in ${KERNEL_CONFIG_FRAGMENTS}; do
+            if [ -f "$fragment" ]; then
+                ${S}/scripts/kconfig/merge_config.sh -m -r ${B}/.config $fragment
+            fi
+        done
+    fi
+}
+
+# Override do_compile to use external Rockchip toolchain
+# The kernel class applies Yocto's CC/CROSS_COMPILE which forces GCC 14
+do_compile() {
+    # Use toolchain from SDK directly
+    export PATH="${EXTERNAL_TOOLCHAIN_BIN}:$PATH"
+    export CROSS_COMPILE="${EXTERNAL_TOOLCHAIN_PREFIX}"
+    export ARCH="arm"
+    
+    # Kernel 5.10 scripts may use 'python' instead of 'python3'
+    # Create a wrapper script if python doesn't exist
+    if ! command -v python >/dev/null 2>&1; then
+        mkdir -p ${WORKDIR}/python-wrapper
+        ln -sf $(command -v python3) ${WORKDIR}/python-wrapper/python
+        export PATH="${WORKDIR}/python-wrapper:$PATH"
+    fi
+    
+    # Build kernel with external toolchain (out-of-tree)
+    unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+    make -C ${S} O=${B} -j ${@oe.utils.parallel_make(d)} \
+        HOSTCC="${BUILD_CC}" \
+        HOSTCPP="${BUILD_CPP}" \
+        KBUILD_BUILD_USER="oe-user" \
+        KBUILD_BUILD_HOST="oe-host" \
+        ${KERNEL_IMAGETYPE} modules dtbs
+}
+
+# Override do_compile_kernelmodules - kernel class splits this out
+do_compile_kernelmodules() {
+    :
+}
