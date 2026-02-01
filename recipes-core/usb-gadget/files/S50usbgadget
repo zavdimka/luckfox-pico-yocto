@@ -1,0 +1,196 @@
+#!/bin/sh
+#
+# Setup USB Gadget for ACM (Serial Console) and RNDIS (Ethernet over USB)
+# Simplified version for Luckfox Pico - enables VCP and network access
+#
+
+CONFIGFS_DIR=/sys/kernel/config
+USB_GADGET_DIR=${CONFIGFS_DIR}/usb_gadget
+USB_GROUP=luckfox
+USB_DEVICE_DIR=${USB_GADGET_DIR}/${USB_GROUP}
+USB_STRINGS_DIR=${USB_DEVICE_DIR}/strings/0x409
+USB_FUNCTIONS_DIR=${USB_DEVICE_DIR}/functions
+USB_CONFIG_DIR=${USB_DEVICE_DIR}/configs/c.1
+USB_CONFIG_STRINGS_DIR=${USB_CONFIG_DIR}/strings/0x409
+
+# USB device identification
+USB_VENDOR_ID=0x2207   # Rockchip vendor ID
+USB_PRODUCT_ID=0x0019  # Composite device
+USB_DEVICE_BCD=0x0310
+USB_USB_BCD=0x0200
+
+# Network configuration for RNDIS
+RNDIS_IP=172.32.0.1
+RNDIS_NETMASK=24
+
+configfs_init()
+{
+	# Mount configfs if not already mounted
+	if [ ! -d ${CONFIGFS_DIR}/usb_gadget ]; then
+		mount -t configfs none ${CONFIGFS_DIR}
+	fi
+
+	# Create gadget directory
+	mkdir -p ${USB_DEVICE_DIR}
+	cd ${USB_DEVICE_DIR}
+
+	# Set USB device IDs
+	echo ${USB_VENDOR_ID} > idVendor
+	echo ${USB_PRODUCT_ID} > idProduct
+	echo ${USB_DEVICE_BCD} > bcdDevice
+	echo ${USB_USB_BCD} > bcdUSB
+
+	# Set device strings
+	mkdir -p ${USB_STRINGS_DIR}
+	
+	# Get serial number from CPU info or use default
+	SERIAL=$(grep -o 'Serial\s*:\s*[0-9a-fA-F]*' /proc/cpuinfo | awk '{print $3}')
+	if [ -z "$SERIAL" ]; then
+		SERIAL="0123456789ABCDEF"
+	fi
+	
+	echo ${SERIAL} > ${USB_STRINGS_DIR}/serialnumber
+	echo "Luckfox" > ${USB_STRINGS_DIR}/manufacturer
+	echo "Luckfox Pico" > ${USB_STRINGS_DIR}/product
+
+	# Create configuration
+	mkdir -p ${USB_CONFIG_DIR}
+	mkdir -p ${USB_CONFIG_STRINGS_DIR}
+	echo "ACM+RNDIS" > ${USB_CONFIG_STRINGS_DIR}/configuration
+	echo 500 > ${USB_CONFIG_DIR}/MaxPower
+
+	# Enable OS descriptors for Windows compatibility
+	echo 1 > ${USB_DEVICE_DIR}/os_desc/use
+	echo 0x1 > ${USB_DEVICE_DIR}/os_desc/b_vendor_code
+	echo "MSFT100" > ${USB_DEVICE_DIR}/os_desc/qw_sign
+	ln -s ${USB_CONFIG_DIR} ${USB_DEVICE_DIR}/os_desc/c.1
+}
+
+setup_acm()
+{
+	# Create ACM function (Virtual COM Port / Serial Console)
+	mkdir -p ${USB_FUNCTIONS_DIR}/acm.usb0
+	
+	# Link ACM function to configuration
+	ln -s ${USB_FUNCTIONS_DIR}/acm.usb0 ${USB_CONFIG_DIR}/acm.usb0
+	
+	echo "ACM (Virtual COM Port) configured"
+}
+
+setup_rndis()
+{
+	# Create RNDIS function (Ethernet over USB)
+	mkdir -p ${USB_FUNCTIONS_DIR}/rndis.usb0
+	
+	# Set MAC addresses (use locally administered addresses)
+	echo "02:11:22:33:44:55" > ${USB_FUNCTIONS_DIR}/rndis.usb0/host_addr
+	echo "02:11:22:33:44:56" > ${USB_FUNCTIONS_DIR}/rndis.usb0/dev_addr
+	
+	# Enable WCEIS for Windows compatibility
+	echo 1 > ${USB_FUNCTIONS_DIR}/rndis.usb0/wceis 2>/dev/null || true
+	
+	# Link RNDIS function to configuration
+	ln -s ${USB_FUNCTIONS_DIR}/rndis.usb0 ${USB_CONFIG_DIR}/rndis.usb0
+	
+	echo "RNDIS (Ethernet over USB) configured"
+}
+
+bind_gadget()
+{
+	# Find and bind to UDC (USB Device Controller)
+	UDC=$(ls /sys/class/udc/ 2>/dev/null | head -n 1)
+	
+	if [ -z "$UDC" ]; then
+		echo "Error: No UDC found"
+		return 1
+	fi
+	
+	echo ${UDC} > ${USB_DEVICE_DIR}/UDC
+	echo "USB Gadget bound to ${UDC}"
+}
+
+configure_network()
+{
+	# Wait for usb0 interface to appear
+	sleep 0.5
+	
+	# Configure the RNDIS network interface using ip command
+	if [ -e /sys/class/net/usb0 ]; then
+		ip addr add ${RNDIS_IP}/${RNDIS_NETMASK} dev usb0
+		ip link set usb0 up
+		echo "Network interface usb0 configured: ${RNDIS_IP}"
+		echo "Connect from host with IP in range 172.32.0.x (e.g., 172.32.0.2)"
+	else
+		echo "Warning: usb0 interface not found"
+	fi
+}
+
+unbind_gadget()
+{
+	# Unbind from UDC
+	if [ -e ${USB_DEVICE_DIR}/UDC ]; then
+		echo "" > ${USB_DEVICE_DIR}/UDC 2>/dev/null || true
+	fi
+	
+	# Remove configuration links
+	rm -f ${USB_CONFIG_DIR}/acm.usb0 2>/dev/null || true
+	rm -f ${USB_CONFIG_DIR}/rndis.usb0 2>/dev/null || true
+	rm -f ${USB_DEVICE_DIR}/os_desc/c.1 2>/dev/null || true
+	
+	# Remove functions
+	rmdir ${USB_FUNCTIONS_DIR}/acm.usb0 2>/dev/null || true
+	rmdir ${USB_FUNCTIONS_DIR}/rndis.usb0 2>/dev/null || true
+	
+	# Remove configuration
+	rmdir ${USB_CONFIG_STRINGS_DIR} 2>/dev/null || true
+	rmdir ${USB_CONFIG_DIR} 2>/dev/null || true
+	
+	# Remove strings
+	rmdir ${USB_STRINGS_DIR} 2>/dev/null || true
+	
+	# Remove gadget
+	rmdir ${USB_DEVICE_DIR} 2>/dev/null || true
+	
+	echo "USB Gadget removed"
+}
+
+case "$1" in
+	start)
+		echo "Starting USB Gadget (ACM + RNDIS)..."
+		
+		# Initialize configfs
+		configfs_init
+		
+		# Setup USB functions
+		setup_acm
+		setup_rndis
+		
+		# Bind to USB controller
+		bind_gadget
+		
+		# Configure network interface
+		configure_network
+		
+		echo "USB Gadget started successfully"
+		echo "- Serial console available on /dev/ttyGS0"
+		echo "- Network available on usb0 (${RNDIS_IP})"
+		;;
+		
+	stop)
+		echo "Stopping USB Gadget..."
+		unbind_gadget
+		;;
+		
+	restart|reload)
+		$0 stop
+		sleep 1
+		$0 start
+		;;
+		
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+		;;
+esac
+
+exit 0

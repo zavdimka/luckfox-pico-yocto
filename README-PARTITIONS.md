@@ -46,6 +46,14 @@ MACHINE=luckfox-pico-sd bitbake luckfox-image-minimal
 
 Creates image for SD card (mmcblk1)
 
+### SPI NAND
+
+```bash
+MACHINE=luckfox-pico-spi-nand bitbake luckfox-image-minimal
+```
+
+Creates image for SPI NAND flash (mtd devices, UBI filesystem)
+
 ## Machine Configuration
 
 ### Base Machine (luckfox-pico.conf)
@@ -64,7 +72,36 @@ ROCKCHIP_PARTITION_LAYOUT = "32K(env),512K@32K(idblock),256K(uboot),32M(boot),-(
 require conf/machine/luckfox-pico.conf
 
 # Override for SD card
-ROCKCHIP_BOOT_MEDIUM = "sd_card"
+RK_BOOT_MEDIUM = "sd_card"
+ROCKCHIP_BOOT_MEDIUM = "${RK_BOOT_MEDIUM}"
+```
+
+### SPI NAND Variant (luckfox-pico-spi-nand.conf)
+
+```bitbake
+require conf/machine/luckfox-pico.conf
+
+# Override for SPI NAND
+RK_BOOT_MEDIUM = "spi_nand"
+ROCKCHIP_BOOT_MEDIUM = "${RK_BOOT_MEDIUM}"
+
+# NAND-specific parameters
+RK_NAND_BLOCK_SIZE ?= "0x20000"
+RK_NAND_PAGE_SIZE ?= "2048"
+RK_NAND_OOB_SIZE ?= "128"
+```
+
+### SPI NOR Variant (luckfox-pico-spi-nor.conf)
+
+```bitbake
+require conf/machine/luckfox-pico.conf
+
+# Override for SPI NOR
+RK_BOOT_MEDIUM = "spi_nor"
+ROCKCHIP_BOOT_MEDIUM = "${RK_BOOT_MEDIUM}"
+
+# Typically smaller partition layout for limited NOR capacity
+ROCKCHIP_PARTITION_LAYOUT = "32K(env),512K@32K(idblock),256K(uboot),4M(boot),-(rootfs)"
 ```
 
 ## Custom Partition Layouts

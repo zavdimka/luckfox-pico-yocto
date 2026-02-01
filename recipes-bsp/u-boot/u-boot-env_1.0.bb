@@ -9,7 +9,7 @@ inherit deploy rockchip-partition
 
 # U-Boot environment variables for Luckfox Pico
 # blkdevparts is generated from ROCKCHIP_PARTITION_LAYOUT
-UBOOT_ENV_BOOTARGS ?= "root=/dev/${@'mmcblk1p5' if d.getVar('ROCKCHIP_BOOT_MEDIUM') == 'sd_card' else 'mmcblk0p5'} rootfstype=ext4 console=ttyFIQ0,115200n8 rk_dma_heap_cma=1M"
+UBOOT_ENV_BOOTARGS ?= "${RK_BOOT_ROOT_ARGS} console=${SERIAL_CONSOLE} rk_dma_heap_cma=1M"
 UBOOT_ENV_BOOTCMD ?= "boot_fit"
 
 # Environment size (must match U-Boot config) - RV1106 uses 32KB
@@ -18,11 +18,11 @@ UBOOT_ENV_SIZE ?= "0x8000"
 do_compile() {
     # Create U-Boot environment text file with proper quoting
     # blkdevparts is dynamically generated from partition layout
-    bbplain "blkdevparts= ${ROCKCHIP_BLKDEVPARTS}"
+    bbplain "${RK_BLKDEVPARTS}"
     bbplain "sys_bootargs= ${UBOOT_ENV_BOOTARGS}"
     bbplain "bootcmd= ${UBOOT_ENV_BOOTCMD}"
 
-    echo "blkdevparts=${ROCKCHIP_BLKDEVPARTS}" > ${WORKDIR}/uboot-env.txt
+    echo "${RK_BLKDEVPARTS}" > ${WORKDIR}/uboot-env.txt
     echo "bootcmd=${UBOOT_ENV_BOOTCMD}" >> ${WORKDIR}/uboot-env.txt
     echo "sys_bootargs=${UBOOT_ENV_BOOTARGS}" >> ${WORKDIR}/uboot-env.txt
     

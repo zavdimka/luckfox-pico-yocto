@@ -8,7 +8,7 @@ inherit image_types rockchip-partition
 IMAGE_TYPES += "rockchip-disk"
 
 # Size for the complete disk image (600MB)
-ROCKCHIP_DISK_SIZE ??= "614400"
+RK_DISK_SIZE ??= "614400"
 
 do_image_rockchip_disk[depends] += " \
     e2fsprogs-native:do_populate_sysroot \
@@ -70,7 +70,7 @@ IMAGE_CMD:rockchip-disk() {
     bbnote "  rootfs.ext4: $ROOTFS_SIZE bytes"
     
     # Calculate disk image size (rootfs offset + rootfs size, rounded up)
-    ROOTFS_OFFSET="${ROCKCHIP_PART_ROOTFS_OFFSET}"
+    ROOTFS_OFFSET="${RK_PART_ROOTFS_OFFSET}"
     DISK_SIZE=`expr $ROOTFS_OFFSET + $ROOTFS_SIZE || true`
     DISK_SIZE_MB=`expr \( $DISK_SIZE + 1048575 \) / 1048576 || true`
     
@@ -79,14 +79,14 @@ IMAGE_CMD:rockchip-disk() {
     dd if=/dev/zero of=${DISK_IMG} bs=1M count=${DISK_SIZE_MB}
     
     # Write bootloader components using parsed partition offsets
-    # Layout is dynamically calculated from ROCKCHIP_PARTITION_LAYOUT
+    # Layout is dynamically calculated from RK_PARTITION_LAYOUT
     
     # Get partition offsets (in bytes, convert to sectors)
-    ENV_OFFSET="${ROCKCHIP_PART_ENV_OFFSET}"
-    IDBLOCK_OFFSET="${ROCKCHIP_PART_IDBLOCK_OFFSET}"
-    UBOOT_OFFSET="${ROCKCHIP_PART_UBOOT_OFFSET}"
-    BOOT_OFFSET="${ROCKCHIP_PART_BOOT_OFFSET}"
-    ROOTFS_OFFSET="${ROCKCHIP_PART_ROOTFS_OFFSET}"
+    ENV_OFFSET="${RK_PART_ENV_OFFSET}"
+    IDBLOCK_OFFSET="${RK_PART_IDBLOCK_OFFSET}"
+    UBOOT_OFFSET="${RK_PART_UBOOT_OFFSET}"
+    BOOT_OFFSET="${RK_PART_BOOT_OFFSET}"
+    ROOTFS_OFFSET="${RK_PART_ROOTFS_OFFSET}"
     
     # Convert bytes to 512-byte sectors
     ENV_SECTOR=`expr $ENV_OFFSET / 512 || true`

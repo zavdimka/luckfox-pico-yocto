@@ -1,0 +1,4 @@
+# Add getty on USB gadget serial console (ttyGS0)
+# This allows login via USB serial when USB gadget is enabled
+
+ttyGS0::respawn:/sbin/getty -L ttyGS0 115200 vt100

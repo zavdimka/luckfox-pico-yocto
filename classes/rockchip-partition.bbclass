@@ -5,7 +5,7 @@
 # Format: size@offset(name) where offset is optional
 ROCKCHIP_PARTITION_LAYOUT ??= "32K(env),512K@32K(idblock),256K(uboot),32M(boot),-(rootfs)"
 
-# Boot medium type (emmc or sd_card)
+# Boot medium type (emmc, sd_card, spi_nand, spi_nor, slc_nand)
 ROCKCHIP_BOOT_MEDIUM ??= "emmc"
 
 def parse_rockchip_partitions(d):
@@ -32,9 +32,9 @@ def parse_rockchip_partitions(d):
         
         return value * multipliers[unit]
     
-    layout = d.getVar('ROCKCHIP_PARTITION_LAYOUT')
+    layout = d.getVar('RK_PARTITION_LAYOUT')
     if not layout:
-        bb.fatal("ROCKCHIP_PARTITION_LAYOUT is not defined")
+        bb.fatal("RK_PARTITION_LAYOUT is not defined")
     
     partitions = []
     offset = 0
@@ -75,11 +75,11 @@ def parse_rockchip_partitions(d):
             offset += size_bytes
     
     # Store parsed partitions in datastore
-    d.setVar('ROCKCHIP_PARTITIONS_PARSED', str(partitions))
+    d.setVar('RK_PARTITIONS_PARSED', str(partitions))
     
     # Export individual partition info for easy access
     for part in partitions:
-        var_prefix = f"ROCKCHIP_PART_{part['name'].upper().replace('-', '_')}"
+        var_prefix = f"RK_PART_{part['name'].upper().replace('-', '_')}"
         d.setVar(f"{var_prefix}_SIZE", str(part['size']))
         d.setVar(f"{var_prefix}_OFFSET", str(part['offset']))
         d.setVar(f"{var_prefix}_SIZE_STR", part['size_str'])
@@ -88,17 +88,41 @@ def parse_rockchip_partitions(d):
 python() {
     parse_rockchip_partitions(d)
     
-    # Generate blkdevparts string for U-Boot
-    layout = d.getVar('ROCKCHIP_PARTITION_LAYOUT')
-    medium = d.getVar('ROCKCHIP_BOOT_MEDIUM')
+    # Generate blkdevparts/mtdparts string for U-Boot
+    layout = d.getVar('RK_PARTITION_LAYOUT')
+    medium = d.getVar('RK_BOOT_MEDIUM')
     
     if medium == 'emmc':
         device = 'mmcblk0'
+        blkdevparts = f"blkdevparts={device}:{layout}"
+        d.setVar('RK_DEVICE_PREFIX', 'mmcblk0p')
+        d.setVar('RK_PART_NUM_START', '1')
     elif medium == 'sd_card':
         device = 'mmcblk1'
+        blkdevparts = f"blkdevparts={device}:{layout}"
+        d.setVar('RK_DEVICE_PREFIX', 'mmcblk1p')
+        d.setVar('RK_PART_NUM_START', '1')
+    elif medium == 'spi_nand':
+        device = 'spi-nand0'
+        blkdevparts = f"mtdparts={device}:{layout}"
+        d.setVar('RK_DEVICE_PREFIX', 'mtd')
+        d.setVar('RK_PART_NUM_START', '0')
+    elif medium == 'spi_nor':
+        device = 'sfc_nor'
+        blkdevparts = f"mtdparts={device}:{layout}"
+        d.setVar('RK_DEVICE_PREFIX', 'mtdblock')
+        d.setVar('RK_PART_NUM_START', '0')
+    elif medium == 'slc_nand':
+        device = 'rk-nand'
+        blkdevparts = f"mtdparts={device}:{layout}"
+        d.setVar('RK_DEVICE_PREFIX', 'mtd')
+        d.setVar('RK_PART_NUM_START', '0')
     else:
         device = medium
+        blkdevparts = f"{device}:{layout}"
+        d.setVar('RK_DEVICE_PREFIX', device)
+        d.setVar('RK_PART_NUM_START', '0')
     
-    blkdevparts = f"{device}:{layout}"
-    d.setVar('ROCKCHIP_BLKDEVPARTS', blkdevparts)
+    d.setVar('RK_BLKDEVPARTS', blkdevparts)
+    d.setVar('RK_PARTITION_ARGS', blkdevparts)
 }

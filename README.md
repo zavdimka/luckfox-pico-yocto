@@ -9,12 +9,13 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 ## 🎯 Features
 
 - ✅ **Yocto Scarthgap (5.1)** - Latest stable Yocto release
-- ✅ **Multiple Boot Media** - eMMC (tested) and SD card support with SDK-compatible partition layouts
+- ✅ **Multiple Boot Media** - eMMC, SD card (tested ✓), SPI NAND (🚧 needs fixes) with SDK-compatible partition layouts
 - ✅ **FIT Boot Images** - Flattened Image Tree format with kernel, DTB, and ramdisk
 - ✅ **U-Boot Integration** - Custom bootloader with environment configuration
 - ✅ **WiFi Drivers** - AIC8800DC wireless support
 - ✅ **Complete Disk Images** - Ready-to-flash `.img` files for eMMC/SD card
 - ✅ **SDK Compatibility** - Partition layout compatible with Luckfox SDK format
+- ✅ **USB Gadget Support** - Serial console (ttyGS0) and Ethernet over USB (RNDIS)
 
 ## 📋 Prerequisites
 
@@ -28,9 +29,7 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 ### Supported Host Systems
 
 - Ubuntu 22.04 LTS (Recommended)
-- Ubuntu 20.04 LTS
 - Debian 12 (Bookworm)
-- Debian 11 (Bullseye)
 - Fedora 38+
 - openSUSE Leap 15.4+
 
@@ -143,25 +142,45 @@ sudo upgrade_tool wl 0 luckfox-image-minimal-luckfox-pico.img
 ```
 luckfox-pico-yocto/
 ├── conf/
-│   ├── layer.conf                 # Layer configuration
+│   ├── layer.conf                     # Layer configuration
+│   ├── bblayers.conf                  # Build layers configuration
+│   ├── local.conf                     # Local build settings
+│   ├── distro/                        # Distribution configs
 │   └── machine/
-│       ├── luckfox-pico.conf     # eMMC machine config
-│       └── luckfox-pico-sd.conf  # SD card machine config
-├── recipes-kernel/
-│   ├── linux/                     # Linux kernel recipes
-│   ├── aic8800dc/                # AIC8800DC WiFi driver
-├── recipes-bsp/
-│   └── u-boot/                    # U-Boot bootloader
-│       ├── u-boot-luckfox/       # U-Boot recipes
-│       └── u-boot-env/           # Environment configuration
-├── recipes-core/
-│   └── images/                    # Image recipes
-│       ├── luckfox-image-minimal.bb
-│       └── luckfox-image-full.bb
+│       ├── luckfox-pico.conf          # eMMC machine config
+│       ├── luckfox-pico-sd.conf       # SD card machine config
+│       └── luckfox-pico-spi-nand.conf # SPI NAND machine config
 ├── classes/
-│   ├── rockchip-boot.bbclass     # FIT image generation
-│   ├── rockchip-disk.bbclass     # Disk image creation
-│   └── rockchip-partition.bbclass # Partition layout parser
+│   ├── luckfox-ext-toolchain.bbclass  # External toolchain support
+│   ├── rockchip-disk.bbclass          # Disk image creation
+│   └── rockchip-partition.bbclass     # Partition layout parser
+├── recipes-kernel/
+│   ├── linux/                         # Linux kernel 5.10.160
+│   │   ├── linux-luckfox_5.10.160.bb  # Kernel recipe
+│   │   ├── linux-luckfox_5.10.160.bbappend  # FIT image support
+│   │   └── files/                     # Kernel configs & DTS files
+│   ├── aic8800dc/                     # AIC8800DC WiFi driver
+│   └── make-mod-scripts/              # Kernel module build support
+├── recipes-bsp/
+│   └── u-boot/
+│       ├── u-boot-luckfox/            # U-Boot 2017.09 recipe
+│       └── u-boot-env/                # Environment configuration
+├── recipes-core/
+│   ├── images/
+│   │   └── luckfox-image-minimal.bb   # Minimal bootable image
+│   ├── base-files/                    # Base system files
+│   ├── sysvinit/                      # Init system configuration
+│   │   └── sysvinit-inittab_%.bbappend  # Serial console support (ttyFIQ0, ttyGS0)
+│   └── usb-gadget/                    # USB gadget support
+│       └── usb-gadget_1.0.bb          # ACM serial + RNDIS ethernet
+├── recipes-devtools/
+│   └── toolchain/                     # External toolchain setup
+├── recipes-extended/
+│   └── xz/                            # XZ compression utilities
+├── README.md
+├── README-PARTITIONS.md               # Partition layout documentation
+└── .gitignore
+```
 └── README.md
 ```
 
@@ -176,12 +195,21 @@ luckfox-pico-yocto/
 MACHINE=luckfox-pico bitbake luckfox-image-minimal
 ```
 
-#### SD Card
+#### SD Card ✅ Tested & Working
 
 ```bash
 # Build for SD card (uses mmcblk1 instead of mmcblk0)
 MACHINE=luckfox-pico-sd bitbake luckfox-image-minimal
 ```
+
+#### SPI NAND 🚧 Work in Progress
+
+```bash
+# SPI NAND support - builds but needs UBIFS/UBI implementation fixes
+MACHINE=luckfox-pico-spi-nand bitbake luckfox-image-minimal
+```
+
+**Note**: SPI NAND builds successfully but requires additional work for proper UBIFS/UBI filesystem support. Contributions welcome!
 
 ### Customize Partition Layout
 

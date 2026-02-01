@@ -17,8 +17,8 @@ do_deploy:append() {
     # Create output directory for FIT components
     mkdir -p ${B}/fit-out
     
-    # Find the DTB file that was deployed
-    DTB_NAME="rv1106g-av.dtb"
+    # Find the DTB file that was deployed (use KERNEL_DEVICETREE from machine config)
+    DTB_NAME="${KERNEL_DEVICETREE}"
     DTB_SOURCE="${DEPLOYDIR}/${DTB_NAME}"
     
     if [ ! -f "${DTB_SOURCE}" ]; then

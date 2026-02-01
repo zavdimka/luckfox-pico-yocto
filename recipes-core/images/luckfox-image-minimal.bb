@@ -9,6 +9,9 @@ IMAGE_INSTALL:append = " luckfox-users"
 # Add kernel module utilities and init scripts
 IMAGE_INSTALL:append = " kernel-modules kmod"
 
+# Add USB Gadget support (ACM serial console + RNDIS ethernet)
+IMAGE_INSTALL:append = " usb-gadget"
+
 # Add WiFi driver modules
 # IMAGE_INSTALL:append = " kernel-module-aic8800dc"
 

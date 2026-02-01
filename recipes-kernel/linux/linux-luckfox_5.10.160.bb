@@ -8,10 +8,11 @@ PR = "r0"
 
 SRC_URI = " \
     git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main \
-    file://rv1106g-av.dts \
+    file://${KERNEL_DTS_FILE} \
     file://sdk-kernel.config \
     file://rv1106-bt.config \
     file://luckfox_rv1106-wwan-ndis-ppp.config \
+    file://usb-gadget.config \
 "
 
 SRCREV = "${AUTOREV}"
@@ -27,12 +28,13 @@ inherit kernel luckfox-ext-toolchain
 DEPENDS += "bc-native"
 
 KERNEL_IMAGETYPE = "Image"
-KERNEL_DEVICETREE = "rv1106g-av.dtb"
+# Auto-derive DTB name from DTS file specified in machine config
+KERNEL_DEVICETREE = "${@d.getVar('KERNEL_DTS_FILE').replace('.dts', '.dtb')}"
 
 KBUILD_DEFCONFIG = "rv1106_defconfig"
-KERNEL_CONFIG_FRAGMENTS += "${WORKDIR}/sources-unpack/sdk-kernel.config ${WORKDIR}/sources-unpack/rv1106-bt.config ${WORKDIR}/sources-unpack/luckfox_rv1106-wwan-ndis-ppp.config"
+KERNEL_CONFIG_FRAGMENTS += "${WORKDIR}/sources-unpack/sdk-kernel.config ${WORKDIR}/sources-unpack/rv1106-bt.config ${WORKDIR}/sources-unpack/luckfox_rv1106-wwan-ndis-ppp.config ${WORKDIR}/sources-unpack/usb-gadget.config"
 
-COMPATIBLE_MACHINE = "luckfox-pico"
+COMPATIBLE_MACHINE = "luckfox-pico|luckfox-pico-sd|luckfox-pico-spi-nand|luckfox-pico-spi-nor"
 
 # Skip buildpaths QA check - external toolchain may embed TMPDIR paths
 INSANE_SKIP:kernel-dbg += "buildpaths"
@@ -45,8 +47,8 @@ do_configure() {
     export ARCH="arm"
     
     # Copy custom DTS file to kernel source tree
-    if [ -f "${WORKDIR}/sources-unpack/rv1106g-av.dts" ]; then
-        cp -f ${WORKDIR}/sources-unpack/rv1106g-av.dts ${S}/arch/arm/boot/dts/
+    if [ -f "${WORKDIR}/sources-unpack/${KERNEL_DTS_FILE}" ]; then
+        cp -f ${WORKDIR}/sources-unpack/${KERNEL_DTS_FILE} ${S}/arch/arm/boot/dts/
     fi
     
     # Run defconfig with out-of-tree build
