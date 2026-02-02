@@ -13,6 +13,7 @@ SRC_URI = " \
     file://rv1106-bt.config \
     file://luckfox_rv1106-wwan-ndis-ppp.config \
     file://usb-gadget.config \
+    file://wifi.cfg \
 "
 
 SRCREV = "${AUTOREV}"
@@ -32,7 +33,7 @@ KERNEL_IMAGETYPE = "Image"
 KERNEL_DEVICETREE = "${@d.getVar('KERNEL_DTS_FILE').replace('.dts', '.dtb')}"
 
 KBUILD_DEFCONFIG = "rv1106_defconfig"
-KERNEL_CONFIG_FRAGMENTS += "${WORKDIR}/sources-unpack/sdk-kernel.config ${WORKDIR}/sources-unpack/rv1106-bt.config ${WORKDIR}/sources-unpack/luckfox_rv1106-wwan-ndis-ppp.config ${WORKDIR}/sources-unpack/usb-gadget.config"
+KERNEL_CONFIG_FRAGMENTS += "${WORKDIR}/sources-unpack/sdk-kernel.config ${WORKDIR}/sources-unpack/rv1106-bt.config ${WORKDIR}/sources-unpack/luckfox_rv1106-wwan-ndis-ppp.config ${WORKDIR}/sources-unpack/usb-gadget.config ${WORKDIR}/sources-unpack/wifi.cfg"
 
 COMPATIBLE_MACHINE = "luckfox-pico|luckfox-pico-sd|luckfox-pico-spi-nand|luckfox-pico-spi-nor"
 

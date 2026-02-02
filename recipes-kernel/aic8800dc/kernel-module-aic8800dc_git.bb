@@ -9,6 +9,9 @@ PV = "1.0+git${SRCPV}"
 
 SRC_URI = "git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main;subpath=sysdrv/drv_ko/wifi/aic8800dc;destsuffix=git;name=aic8800dc \
            file://Makefile \
+           file://aic8800_bsp-Kbuild \
+           file://aic8800_fdrv-Kbuild \
+           file://aic8800_btlpm-Kbuild \
            file://aic8800dc-wifi.init \
 "
 
@@ -22,16 +25,38 @@ EXTRA_OEMAKE = ' \
     KDIR=${STAGING_KERNEL_BUILDDIR} \
 '
 
-# Copy our simplified Makefile to the source directory after unpacking
-do_patch:append() {
-    bb.plain("Installing custom Makefile for aic8800dc")
-    import shutil
-    makefile_src = os.path.join(d.getVar('WORKDIR'), 'sources-unpack', 'Makefile')
-    makefile_dst = os.path.join(d.getVar('S'), 'Makefile')
-    shutil.copy2(makefile_src, makefile_dst)
+# Override do_configure to skip the clean step (building from git, always fresh)
+do_configure() {
+    :
 }
 
-# Create a minimal Makefile wrapper in build artifacts if it doesn't exist
+# Replace SDK Makefile with our Yocto-compatible version
+do_patch:append() {
+    bb.plain("Installing Yocto-compatible Makefile and Kbuild files for aic8800dc")
+    import shutil
+    import os
+    
+    workdir = d.getVar('WORKDIR')
+    srcdir = d.getVar('S')
+    sources_unpack = os.path.join(workdir, 'sources-unpack')
+    
+    # Copy top-level Makefile
+    shutil.copy2(os.path.join(sources_unpack, 'Makefile'), os.path.join(srcdir, 'Makefile'))
+    
+    # Copy Kbuild files to subdirectories and remove SDK Makefiles
+    for module in ['aic8800_bsp', 'aic8800_fdrv', 'aic8800_btlpm']:
+        module_dir = os.path.join(srcdir, module)
+        # Remove SDK Makefile (it conflicts with our Kbuild)
+        sdk_makefile = os.path.join(module_dir, 'Makefile')
+        if os.path.exists(sdk_makefile):
+            os.remove(sdk_makefile)
+        # Copy our Kbuild file
+        kbuild_src = os.path.join(sources_unpack, f'{module}-Kbuild')
+        kbuild_dst = os.path.join(module_dir, 'Kbuild')
+        shutil.copy2(kbuild_src, kbuild_dst)
+}
+
+# Create a minimal Makefile wrapper in build artifacts if needed
 do_compile:prepend() {
     if [ ! -f "${STAGING_KERNEL_BUILDDIR}/Makefile" ]; then
         cat > ${STAGING_KERNEL_BUILDDIR}/Makefile << 'EOFMK'
@@ -43,6 +68,13 @@ MAKEFLAGS += --no-print-directory
 %:
 	@$(MAKE) -C ${STAGING_KERNEL_DIR} O=${STAGING_KERNEL_BUILDDIR} $@
 EOFMK
+    fi
+}
+
+# Copy Module.symvers from kernel build dir to module source for dependency tracking
+do_compile:append() {
+    if [ -f "${STAGING_KERNEL_BUILDDIR}/Module.symvers" ]; then
+        cp ${STAGING_KERNEL_BUILDDIR}/Module.symvers ${B}/
     fi
 }
 

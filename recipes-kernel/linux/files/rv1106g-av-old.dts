@@ -26,11 +26,26 @@
                 };
         };
 
+		cc33xx_en_reg: fixedregulator@1 {
+            compatible = "regulator-fixed";
+            regulator-name = "cc33xx-en-regulator";
+            regulator-min-microvolt = <1800000>;
+            regulator-max-microvolt = <1800000>;
+            startup-delay-us = <1000>;  /* HW init grace period */
+            gpio = <&gpio3 RK_PC4 0>;
+            enable-active-high;
+            regulator-always-on; /* Keeps the  reset pin de-asserted (high) if regulator is not in use */
+			status = "okay";
+	    };
+
+/*
 	sdio_pwrseq: sdio-pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		pinctrl-names = "default";
-		reset-gpios = <&gpio1 RK_PA0 GPIO_ACTIVE_LOW>;
-	};
+				compatible = "mmc-pwrseq-simple";
+				pinctrl-names = "default";
+				//reset-gpios = <&gpio0 RK_PA3 GPIO_ACTIVE_LOW>;
+				reset-gpios = <&gpio3 RK_PC4 GPIO_ACTIVE_LOW>;
+		};
+*/
 
 	wireless_bluetooth: wireless-bluetooth {
 	compatible = "bluetooth-platdata";
@@ -94,6 +109,7 @@
 /**********SDIO-WIFI**********/
 &sdmmc {
 	max-frequency = <50000000>;
+	vmmc-supply = <&cc33xx_en_reg>;
 	bus-width = <4>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
@@ -103,10 +119,17 @@
 	// no-sd;
 	// no-mmc;
 	supports-sdio;
-	mmc-pwrseq = <&sdio_pwrseq>;
+	//mmc-pwrseq = <&sdio_pwrseq>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_bus4 &sdmmc0_det>;
 	status = "okay";
+	wlcore: wlcore@0 {
+               compatible = "ti,cc33xx";
+               reg = <2>;
+               //interrupt-parent = <&gpio0>;
+               //interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
+               //irq-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+     };
 };
 
 &pinctrl{

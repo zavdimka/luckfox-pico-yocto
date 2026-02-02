@@ -1,0 +1,7 @@
+# Kbuild for aic8800_btlpm module
+ccflags-y += -DAICWF_SDIO_SUPPORT
+
+obj-m := aic8800_btlpm.o
+aic8800_btlpm-y := \
+	aic_btlpm.o \
+	aic_load_fw.o

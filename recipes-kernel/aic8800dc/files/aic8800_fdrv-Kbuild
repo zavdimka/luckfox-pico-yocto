@@ -1,0 +1,30 @@
+# Kbuild for aic8800_fdrv module
+ccflags-y += -DAICWF_SDIO_SUPPORT
+ccflags-y += -DCONFIG_RWNX_FULLMAC
+ccflags-y += -DCONFIG_AIC_FW_PATH=\"/lib/firmware/aic8800\"
+ccflags-y += -DCONFIG_USE_WIRELESS_EXT
+
+obj-m := aic8800_fdrv.o
+aic8800_fdrv-y := \
+	rwnx_msg_tx.o \
+	rwnx_msg_rx.o \
+	rwnx_utils.o \
+	rwnx_cmds.o \
+	rwnx_irqs.o \
+	rwnx_cfgfile.o \
+	rwnx_strs.o \
+	rwnx_rx.o \
+	rwnx_tx.o \
+	rwnx_txq.o \
+	rwnx_main.o \
+	rwnx_mod_params.o \
+	rwnx_mesh.o \
+	rwnx_platform.o \
+	rwnx_pci.o \
+	rwnx_dini.o \
+	rwnx_v7.o \
+	ipc_host.o \
+	aicwf_txrxif.o \
+	aicwf_sdio.o \
+	sdio_host.o \
+	aic_bsp_export.o

@@ -72,15 +72,9 @@ cd ~/luckfox-workspace/yocto-walnascar
 
 # Clone Yocto Poky (Scarthgap 5.1)
 git clone -b scarthgap https://git.yoctoproject.org/poky
-cd poky
-git checkout scarthgap
-cd ..
 
 # Clone meta-openembedded
 git clone -b scarthgap https://github.com/openembedded/meta-openembedded.git
-cd meta-openembedded
-git checkout scarthgap
-cd ../..
 ```
 
 ### 3. Clone the Luckfox Yocto Layer
@@ -107,11 +101,57 @@ Your directory structure should now look like:
 cd ~/luckfox-workspace/luckfox-pico-yocto
 source ../yocto-walnascar/poky/oe-init-build-env ../yocto-walnascar/build-luckfox
 
-# This will create the build directory and configuration files
 # You should now be in ~/luckfox-workspace/yocto-walnascar/build-luckfox
 ```
 
-### 5. Build Your First Image
+This creates the build directory and initial configuration files.
+
+### 5. Configure Build
+
+You need to add the Luckfox layer and configure the build. Edit `conf/bblayers.conf`:
+
+```bash
+nano conf/bblayers.conf
+```
+
+Add the luckfox-pico-yocto and meta-oe layers (use your actual paths):
+
+```bitbake
+BBLAYERS ?= " \
+  /home/<username>/luckfox-workspace/yocto-walnascar/poky/meta \
+  /home/<username>/luckfox-workspace/yocto-walnascar/poky/meta-poky \
+  /home/<username>/luckfox-workspace/yocto-walnascar/poky/meta-yocto-bsp \
+  /home/<username>/luckfox-workspace/yocto-walnascar/meta-openembedded/meta-oe \
+  /home/<username>/luckfox-workspace/luckfox-pico-yocto \
+  "
+```
+
+Then edit `conf/local.conf` to set the machine and distro:
+
+```bash
+nano conf/local.conf
+```
+
+Add or modify these lines:
+
+```bitbake
+MACHINE ?= "luckfox-pico"  # Or luckfox-pico-sd or luckfox-pico-spi-nand
+DISTRO ?= "luckfox"
+```
+
+**Note**: You can override MACHINE at build time without editing local.conf:
+```bash
+# Default (eMMC)
+bitbake luckfox-image-minimal
+
+# SD card
+MACHINE=luckfox-pico-sd bitbake luckfox-image-minimal
+
+# SPI NAND
+MACHINE=luckfox-pico-spi-nand bitbake luckfox-image-minimal
+```
+
+### 6. Build Your First Image
 
 #### Option A: Minimal Image (Recommended for first build)
 
