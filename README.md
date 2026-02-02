@@ -1,6 +1,6 @@
 # Luckfox Pico Yocto Project
 
-[![Yocto Project](https://img.shields.io/badge/Yocto-5.1%20Scarthgap-blue)](https://www.yoctoproject.org/)
+[![Yocto Project](https://img.shields.io/badge/Yocto-5.1%20Walnascar-blue)](https://www.yoctoproject.org/)
 [![License](https://img.shields.io/badge/license-Mixed-green)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Rockchip%20RV1106-orange)](https://www.rock-chips.com/)
 
@@ -8,7 +8,7 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 
 ## 🎯 Features
 
-- ✅ **Yocto Scarthgap (5.1)** - Latest stable Yocto release
+- ✅ **Yocto Walnascar (5.1)** - Latest stable Yocto release
 - ✅ **Multiple Boot Media** - eMMC (tested ✓), SD card (tested ✓), SPI NAND (tested ✓) with SDK-compatible partition layouts
 - ✅ **FIT Boot Images** - Flattened Image Tree format with kernel, DTB, and ramdisk
 - ✅ **U-Boot Integration** - Custom bootloader with environment configuration
