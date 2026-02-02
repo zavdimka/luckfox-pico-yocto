@@ -70,8 +70,7 @@ do_compile() {
     RKBOOT_INI_DIR="${SDK_RKBIN}/RKBOOT"
     
     # Select INI file based on fastboot mode and boot medium (matching SDK logic)
-    # For normal builds (RK_ENABLE_FASTBOOT != y), use standard RV1106MINIALL.ini
-    # For fastboot builds (RK_ENABLE_FASTBOOT = y), use _TB variants based on boot medium
+    # Note: SPI NAND/NOR require specific SPL binaries even in normal (non-fastboot) mode
     if [ "${RK_ENABLE_FASTBOOT}" = "y" ]; then
         case ${RK_BOOT_MEDIUM} in
             emmc)
@@ -94,8 +93,20 @@ do_compile() {
                 ;;
         esac
     else
-        # Normal builds use standard INI file regardless of boot medium
-        RKBIN_INI="${RKBOOT_INI_DIR}/RV1106MINIALL.ini"
+        # Normal builds - select INI based on boot medium
+        # SPI NAND/NOR need specific SPL binaries, SD/eMMC use standard
+        case ${RK_BOOT_MEDIUM} in
+            spi_nand|slc_nand)
+                # RKBIN_INI="${RKBOOT_INI_DIR}/RV1106MINIALL_SPI_NAND_TB.ini"
+                RKBIN_INI="${RKBOOT_INI_DIR}/RV1106MINIALL_SPI_NAND_TB_NOMCU.ini"
+                ;;
+            spi_nor)
+                RKBIN_INI="${RKBOOT_INI_DIR}/RV1106MINIALL_SPI_NOR_TB.ini"
+                ;;
+            emmc|sd_card|*)
+                RKBIN_INI="${RKBOOT_INI_DIR}/RV1106MINIALL.ini"
+                ;;
+        esac
     fi
     
     if [ ! -f "${RKBIN_INI}" ]; then

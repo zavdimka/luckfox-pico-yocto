@@ -20,7 +20,8 @@ DEPENDS += "u-boot-luckfox u-boot-env"
 
 # Use custom Rockchip disk image format instead of WIC
 inherit rockchip-disk
-IMAGE_FSTYPES = "ext4 rockchip-disk"
+# ext4 for eMMC/SD, ubifs+ubi for SPI NAND (ubi depends on ubifs)
+IMAGE_FSTYPES = "ext4 ubifs ubi rockchip-disk"
 
 # Proprietary multimedia stack is optional; leave out by default
 # IMAGE_INSTALL:append = " rockchip-luckfox-blobs"

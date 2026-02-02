@@ -9,11 +9,12 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 ## 🎯 Features
 
 - ✅ **Yocto Scarthgap (5.1)** - Latest stable Yocto release
-- ✅ **Multiple Boot Media** - eMMC, SD card (tested ✓), SPI NAND (🚧 needs fixes) with SDK-compatible partition layouts
+- ✅ **Multiple Boot Media** - eMMC, SD card, SPI NAND (tested ✓) with SDK-compatible partition layouts
 - ✅ **FIT Boot Images** - Flattened Image Tree format with kernel, DTB, and ramdisk
 - ✅ **U-Boot Integration** - Custom bootloader with environment configuration
 - ✅ **WiFi Drivers** - AIC8800DC wireless support
-- ✅ **Complete Disk Images** - Ready-to-flash `.img` files for eMMC/SD card
+- ✅ **Complete Disk Images** - Ready-to-flash `.img` files for all boot media
+- ✅ **UBI/UBIFS Support** - Full UBI/UBIFS implementation for SPI NAND flash
 - ✅ **SDK Compatibility** - Partition layout compatible with Luckfox SDK format
 - ✅ **USB Gadget Support** - Serial console (ttyGS0) and Ethernet over USB (RNDIS)
 
@@ -202,14 +203,21 @@ MACHINE=luckfox-pico bitbake luckfox-image-minimal
 MACHINE=luckfox-pico-sd bitbake luckfox-image-minimal
 ```
 
-#### SPI NAND 🚧 Work in Progress
+#### SPI NAND ✅ Tested & Working
 
 ```bash
-# SPI NAND support - builds but needs UBIFS/UBI implementation fixes
+# Build for SPI NAND with UBI/UBIFS support
 MACHINE=luckfox-pico-spi-nand bitbake luckfox-image-minimal
 ```
 
-**Note**: SPI NAND builds successfully but requires additional work for proper UBIFS/UBI filesystem support. Contributions welcome!
+**Important**: Before flashing to SPI NAND for the first time, or when upgrading from old images, **erase the flash** in U-Boot console to prevent UBI image sequence conflicts:
+
+```
+# In U-Boot console:
+nand erase.part rootfs
+```
+
+Then flash the image using `rkdeveloptool` or `upgrade_tool` as usual.
 
 ### Customize Partition Layout
 

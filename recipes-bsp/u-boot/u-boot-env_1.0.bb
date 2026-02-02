@@ -12,22 +12,27 @@ inherit deploy rockchip-partition
 UBOOT_ENV_BOOTARGS ?= "${RK_BOOT_ROOT_ARGS} console=${SERIAL_CONSOLE} rk_dma_heap_cma=1M"
 UBOOT_ENV_BOOTCMD ?= "boot_fit"
 
-# Environment size (must match U-Boot config) - RV1106 uses 32KB
-UBOOT_ENV_SIZE ?= "0x8000"
-
 do_compile() {
+    # Get env size from partition layout (RK_PART_ENV_SIZE is in bytes)
+    ENV_SIZE="${RK_PART_ENV_SIZE}"
+    
+    if [ -z "$ENV_SIZE" ]; then
+        bbfatal "RK_PART_ENV_SIZE not set - ensure rockchip-partition.bbclass is inherited"
+    fi
+    
     # Create U-Boot environment text file with proper quoting
     # blkdevparts is dynamically generated from partition layout
     bbplain "${RK_BLKDEVPARTS}"
     bbplain "sys_bootargs= ${UBOOT_ENV_BOOTARGS}"
     bbplain "bootcmd= ${UBOOT_ENV_BOOTCMD}"
+    bbplain "env size= $ENV_SIZE bytes"
 
     echo "${RK_BLKDEVPARTS}" > ${WORKDIR}/uboot-env.txt
     echo "bootcmd=${UBOOT_ENV_BOOTCMD}" >> ${WORKDIR}/uboot-env.txt
     echo "sys_bootargs=${UBOOT_ENV_BOOTARGS}" >> ${WORKDIR}/uboot-env.txt
     
-    # Generate binary env.img using mkenvimage
-    mkenvimage -s ${UBOOT_ENV_SIZE} -o ${WORKDIR}/env.img ${WORKDIR}/uboot-env.txt
+    # Generate binary env.img using mkenvimage with size from partition layout
+    mkenvimage -s $ENV_SIZE -o ${WORKDIR}/env.img ${WORKDIR}/uboot-env.txt
 }
 
 do_deploy() {

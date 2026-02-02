@@ -1,9 +1,4 @@
 # Class to parse Rockchip partition layout (SDK-compatible format)
-# Parses partition strings like: "32K(env),512K@32K(idblock),256K(uboot),32M(boot),-(rootfs)"
-
-# Partition definition in SDK format (can be overridden per machine/image)
-# Format: size@offset(name) where offset is optional
-ROCKCHIP_PARTITION_LAYOUT ??= "32K(env),512K@32K(idblock),256K(uboot),32M(boot),-(rootfs)"
 
 # Boot medium type (emmc, sd_card, spi_nand, spi_nor, slc_nand)
 ROCKCHIP_BOOT_MEDIUM ??= "emmc"
@@ -34,7 +29,7 @@ def parse_rockchip_partitions(d):
     
     layout = d.getVar('RK_PARTITION_LAYOUT')
     if not layout:
-        bb.fatal("RK_PARTITION_LAYOUT is not defined")
+        bb.fatal("RK_PARTITION_LAYOUT is not defined. Please set RK_PARTITION_LAYOUT in your machine configuration.")
     
     partitions = []
     offset = 0
@@ -42,14 +37,16 @@ def parse_rockchip_partitions(d):
     for part_str in layout.split(','):
         part_str = part_str.strip()
         
-        # Parse: size@offset(name) or size(name)
-        match = re.match(r'^([^@(]+)(?:@([^(]+))?\(([^)]+)\)', part_str)
+        # Parse: size@offset(name:fstype) or size(name:fstype) or size(name)
+        # fstype is optional after the name, separated by colon
+        match = re.match(r'^([^@(]+)(?:@([^(]+))?\(([^):]+)(?::([^)]+))?\)', part_str)
         if not match:
             bb.fatal(f"Invalid partition format: {part_str}")
         
         size_str = match.group(1).strip()
         offset_str = match.group(2).strip() if match.group(2) else None
         name = match.group(3).strip()
+        fstype = match.group(4).strip() if match.group(4) else None
         
         # Parse size (supports K, M, G, T or -)
         if size_str == '-':
@@ -66,6 +63,7 @@ def parse_rockchip_partitions(d):
             'size': size_bytes,
             'offset': offset,
             'size_str': size_str,
+            'fstype': fstype,
         }
         
         partitions.append(part_info)
@@ -83,9 +81,20 @@ def parse_rockchip_partitions(d):
         d.setVar(f"{var_prefix}_SIZE", str(part['size']))
         d.setVar(f"{var_prefix}_OFFSET", str(part['offset']))
         d.setVar(f"{var_prefix}_SIZE_STR", part['size_str'])
+        if part['fstype']:
+            d.setVar(f"{var_prefix}_FSTYPE", part['fstype'])
 
 # Parse partitions early (before recipes need the data)
 python() {
+    # Verify required variables are set
+    layout = d.getVar('RK_PARTITION_LAYOUT')
+    if not layout:
+        bb.fatal("RK_PARTITION_LAYOUT is not defined. Please set RK_PARTITION_LAYOUT in your machine configuration.")
+    
+    medium = d.getVar('RK_BOOT_MEDIUM')
+    if not medium:
+        bb.fatal("RK_BOOT_MEDIUM is not defined. Please set RK_BOOT_MEDIUM in your machine configuration.")
+    
     parse_rockchip_partitions(d)
     
     # Generate blkdevparts/mtdparts string for U-Boot
