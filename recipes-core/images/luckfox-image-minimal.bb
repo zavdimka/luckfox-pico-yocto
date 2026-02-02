@@ -13,7 +13,7 @@ IMAGE_INSTALL:append = " kernel-modules kmod"
 IMAGE_INSTALL:append = " usb-gadget"
 
 # Add WiFi driver modules
-# IMAGE_INSTALL:append = " kernel-module-aic8800dc"
+IMAGE_INSTALL:append = " kernel-module-aic8800dc"
 
 # Add U-Boot environment for bootloader
 DEPENDS += "u-boot-luckfox u-boot-env"

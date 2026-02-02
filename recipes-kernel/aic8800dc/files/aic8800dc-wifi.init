@@ -1,0 +1,95 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          aic8800dc-wifi
+# Required-Start:    $local_fs
+# Required-Stop:     $local_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Load AIC8800DC WiFi driver
+# Description:       Automatically load AIC8800DC WiFi modules if hardware is detected
+### END INIT INFO
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+case "$1" in
+  start)
+    echo "Checking for AIC8800DC WiFi hardware..."
+    
+    # Check if AIC8800DC hardware is present on SDIO bus
+    if cat /sys/bus/sdio/devices/*/uevent 2>/dev/null | grep -q "8800"; then
+      echo "AIC8800DC hardware detected on SDIO bus, loading modules..."
+      
+      # Load required crypto modules (most should already be loaded)
+      modprobe -q cfg80211 2>/dev/null || true
+      modprobe -q arc4 2>/dev/null || true
+      modprobe -q ctr 2>/dev/null || true
+      modprobe -q ccm 2>/dev/null || true
+      modprobe -q libaes 2>/dev/null || true
+      modprobe -q aes_generic 2>/dev/null || true
+      
+      # Load AIC8800DC modules in proper order
+      if ! lsmod | grep -q aic8800_bsp; then
+        modprobe aic8800_bsp && echo "  Loaded aic8800_bsp"
+        sleep 0.2
+      fi
+      
+      if ! lsmod | grep -q aic8800_fdrv; then
+        modprobe aic8800_fdrv && echo "  Loaded aic8800_fdrv"
+        sleep 0.5
+      fi
+      
+      if ! lsmod | grep -q aic8800_btlpm; then
+        modprobe aic8800_btlpm && echo "  Loaded aic8800_btlpm"
+      fi
+      
+      # Check if wlan0 interface appeared
+      sleep 1
+      if ip link show wlan0 >/dev/null 2>&1; then
+        echo "WiFi interface wlan0 ready"
+      else
+        echo "Warning: wlan0 interface not found"
+      fi
+    else
+      echo "No AIC8800DC hardware detected on SDIO bus, skipping module load"
+    fi
+    ;;
+    
+  stop)
+    echo "Unloading AIC8800DC WiFi modules..."
+    rmmod aic8800_btlpm 2>/dev/null || true
+    sleep 0.2
+    rmmod aic8800_fdrv 2>/dev/null || true
+    sleep 0.2
+    rmmod aic8800_bsp 2>/dev/null || true
+    echo "AIC8800DC modules unloaded"
+    ;;
+    
+  restart|reload|force-reload)
+    $0 stop
+    sleep 1
+    $0 start
+    ;;
+    
+  status)
+    if lsmod | grep -q aic8800; then
+      echo "AIC8800DC modules loaded:"
+      lsmod | grep aic8800
+      if ip link show wlan0 >/dev/null 2>&1; then
+        echo "wlan0 interface: UP"
+      else
+        echo "wlan0 interface: DOWN"
+      fi
+      exit 0
+    else
+      echo "AIC8800DC modules not loaded"
+      exit 1
+    fi
+    ;;
+    
+  *)
+    echo "Usage: $0 {start|stop|restart|status}" >&2
+    exit 3
+    ;;
+esac
+
+exit 0
