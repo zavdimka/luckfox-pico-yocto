@@ -1,31 +1,62 @@
 # Kbuild for aic8800_fdrv module
-ccflags-y += -DAICWF_SDIO_SUPPORT
-ccflags-y += -DCONFIG_RWNX_FULLMAC
-ccflags-y += -DCONFIG_AIC_FW_PATH=\"/lib/firmware/aic8800\"
-ccflags-y += -DCONFIG_USE_WIRELESS_EXT
 
-# Platform and architecture defines
-ccflags-y += -DANDROID_PLATFORM
-ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP
-
-# Core driver configuration
-ccflags-y += -DCONFIG_BR_SUPPORT
-
-# Device limits and constants  
+# Device limits and constants
 ccflags-y += -DNX_VIRT_DEV_MAX=4
-ccflags-y += -DNX_REMOTE_STA_MAX=32
 ccflags-y += -DNX_REMOTE_STA_MAX_FOR_OLD_IC=10
+ccflags-y += -DNX_REMOTE_STA_MAX=32
 ccflags-y += -DNX_MU_GROUP_MAX=62
 ccflags-y += -DNX_TXDESC_CNT=64
 ccflags-y += -DNX_TX_MAX_RATES=4
 ccflags-y += -DNX_CHAN_CTXT_CNT=3
+
+# Core driver configuration
+ccflags-y += -DCONFIG_RWNX_FULLMAC
+ccflags-y += -DCONFIG_AIC_FW_PATH=\"/lib/firmware/aic8800\"
+ccflags-y += -DDEFAULT_COUNTRY_CODE=\"00\"
+
+# Platform configuration
+ccflags-y += -DANDROID_PLATFORM
+ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP
+ccflags-y += -DCONFIG_START_FROM_BOOTROM
+ccflags-y += -DCONFIG_VRF_DCDC_MODE
+
+# Interface support
+ccflags-y += -DAICWF_SDIO_SUPPORT
+ccflags-y += -DCONFIG_SDIO_PWRCTRL
+
+# Features enabled in SDK
+ccflags-y += -DCONFIG_RWNX_RADAR
+ccflags-y += -DUSE_5G
+ccflags-y += -DCONFIG_TXRX_THREAD_PRIO
+ccflags-y += -DCONFIG_COEX
+ccflags-y += -DCONFIG_RX_NETIF_RECV_SKB
+ccflags-y += -DCONFIG_SUPPORT_REALTIME_CHANGE_MAC
+ccflags-y += -DCONFIG_PREALLOC_TXQ
+ccflags-y += -DCONFIG_DPD
+ccflags-y += -DCONFIG_FORCE_DPD_CALIB
+ccflags-y += -DCONFIG_LOFT_CALIB
+ccflags-y += -DCONFIG_RESV_MEM_SUPPORT
+ccflags-y += -DCONFIG_SHUTDOWN_CALLBACK
+ccflags-y += -DCONFIG_MCC
+ccflags-y += -DAICWF_RX_REORDER
+ccflags-y += -DAICWF_ARP_OFFLOAD
+ccflags-y += -DCONFIG_RFTEST
+ccflags-y += -DCONFIG_FILTER_TCP_ACK
+
+# Queue and user configuration
 ccflags-y += -DCONFIG_USER_MAX=1
 ccflags-y += -DNX_TXQ_CNT=4
+
+# Vendor configuration for old kernel
+ccflags-y += -DCONFIG_VENDOR_RWNX_VHT_NO80
+ccflags-y += -DIEEE80211_VHT_CAP_NOT_SUP_WIDTH_80=0
 
 # Warning suppressions
 ccflags-y += -Wno-implicit-fallthrough
 ccflags-y += -Wno-unused-function
 ccflags-y += -Wno-unused-variable
+ccflags-y += -Wno-declaration-after-statement
+ccflags-y += -Wno-dangling-pointer
 
 obj-m := aic8800_fdrv.o
 aic8800_fdrv-y := \
@@ -47,7 +78,17 @@ aic8800_fdrv-y := \
 	rwnx_dini.o \
 	rwnx_v7.o \
 	ipc_host.o \
+	rwnx_tdls.o \
+	aic_vendor.o \
+	md5.o \
+	aicwf_compat_8800dc.o \
+	aicwf_compat_8800d80.o \
+	rwnx_wakelock.o \
+	regdb.o \
+	aic_priv_cmd.o \
+	aicwf_rx_prealloc.o \
+	rwnx_radar.o \
+	sdio_host.o \
 	aicwf_txrxif.o \
 	aicwf_sdio.o \
-	sdio_host.o \
-	aic_bsp_export.o
+	aicwf_tcp_ack.o

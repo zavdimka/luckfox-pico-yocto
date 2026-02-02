@@ -19,6 +19,9 @@ SRCREV_aic8800dc = "${AUTOREV}"
 
 S = "${WORKDIR}/git"
 
+# Disable buildpaths QA check for debug symbols
+INSANE_SKIP:${PN}-dbg += "buildpaths"
+
 EXTRA_OEMAKE = ' \
     ARCH=${ARCH} \
     CROSS_COMPILE=${CROSS_COMPILE} \
@@ -67,17 +70,23 @@ do_compile:append() {
 do_install:append() {
     install -d ${D}${sysconfdir}/init.d
     install -m 0755 ${WORKDIR}/sources-unpack/aic8800dc-wifi.init ${D}${sysconfdir}/init.d/aic8800dc-wifi
+    
+    # Install firmware files
+    install -d ${D}${nonarch_base_libdir}/firmware/aic8800
+    install -m 0644 ${S}/aic8800dc_fw/* ${D}${nonarch_base_libdir}/firmware/aic8800/
 }
 
 # Configure init script to run at boot
 INITSCRIPT_NAME = "aic8800dc-wifi"
 INITSCRIPT_PARAMS = "defaults 90"
 
-# Package the init script
+# Package the init script and firmware
 FILES:${PN} += "${sysconfdir}/init.d/aic8800dc-wifi"
+FILES:${PN} += "${nonarch_base_libdir}/firmware/aic8800/*"
 
 # Kernel module class will handle installation
 # Modules are installed to /lib/modules/<kernel-version>/extra/
+# Firmware is installed to /lib/firmware/aic8800/
 
 RPROVIDES:${PN} += "kernel-module-aic8800dc"
 

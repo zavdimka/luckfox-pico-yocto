@@ -119,4 +119,11 @@ do_shared_workdir:append() {
     if [ -f "${B}/.config" ]; then
         install -m 0644 ${B}/.config ${STAGING_KERNEL_BUILDDIR}/
     fi
+    
+    # Build and copy scripts for module compilation
+    oe_runmake -C ${S} O=${B} scripts
+    if [ -d "${B}/scripts" ]; then
+        mkdir -p ${STAGING_KERNEL_BUILDDIR}/scripts
+        cp -rL ${B}/scripts/* ${STAGING_KERNEL_BUILDDIR}/scripts/
+    fi
 }

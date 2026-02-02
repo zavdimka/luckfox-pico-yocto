@@ -1,5 +1,9 @@
 # Kbuild for aic8800_bsp module
 ccflags-y += -DAICWF_SDIO_SUPPORT
+ccflags-y += -DCONFIG_AIC_FW_PATH=\"/lib/firmware/aic8800\"
+ccflags-y += -DCONFIG_PLATFORM_ROCKCHIP
+ccflags-y += -DANDROID_PLATFORM
+ccflags-y += -Wno-unused-function
 ccflags-y += -DCONFIG_SDIO_PWRCTRL
 ccflags-y += -DCONFIG_LINK_DET_5G
 ccflags-y += -DCONFIG_VRF_DCDC_MODE

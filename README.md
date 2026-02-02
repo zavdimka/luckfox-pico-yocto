@@ -70,7 +70,7 @@ sudo dnf install -y gawk make wget tar bzip2 gzip python3 unzip perl patch \
 mkdir -p ~/luckfox-workspace/yocto-walnascar
 cd ~/luckfox-workspace/yocto-walnascar
 
-# Clone Yocto Poky (Scarthgap 5.1)
+# Clone Yocto Poky (Walnascar)
 git clone -b walnascar https://github.com/yoctoproject/poky.git
 
 # Clone meta-openembedded
@@ -489,11 +489,29 @@ IMAGE_INSTALL:append = " python3 htop nano"
 
 ### Enable WiFi Drivers
 
+The AIC8800DC WiFi driver is fully integrated with automatic firmware deployment:
+
 ```bash
-# Add to conf/local.conf
+# Add to conf/local.conf to include WiFi support
 IMAGE_INSTALL:append = " kernel-module-aic8800dc"
-# or
-IMAGE_INSTALL:append = " kernel-module-rtl8188ftv"
+```
+
+**What's included:**
+- ✅ 3 kernel modules (`aic8800_bsp.ko`, `aic8800_fdrv.ko`, `aic8800_btlpm.ko`)
+- ✅ 21 firmware files installed to `/lib/firmware/aic8800/`
+- ✅ Auto-load init script (`/etc/init.d/aic8800dc-wifi`)
+- ✅ Modules load automatically at boot
+
+**Firmware files deployed:**
+- WiFi firmware patches and calibration data
+- User configuration files (`aic_userconfig_8800dc.txt`)
+- LMAC/FMAC firmware variants for different chip revisions
+
+**Manual module loading (if needed):**
+```bash
+modprobe aic8800_bsp
+modprobe aic8800_fdrv
+modprobe aic8800_btlpm  # For Bluetooth low-power management
 ```
 
 ## 🔧 Advanced Usage
