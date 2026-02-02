@@ -24,6 +24,46 @@ python() {
     # Add ubi dependency for SPI NAND builds (ubi image type includes ubifs)
     if bb.utils.contains('MACHINE_FEATURES', 'ubifs', True, False, d):
         d.appendVarFlag('do_image_rockchip_disk', 'depends', ' ${PN}:do_image_ubi')
+        
+        # Calculate UBI/UBIFS parameters based on NAND flash specs and partition size
+        block_size = int(d.getVar('RK_NAND_BLOCK_SIZE') or '131072')  # Default 128K
+        page_size = int(d.getVar('RK_NAND_PAGE_SIZE') or '2048')     # Default 2K
+        
+        # LEB (Logical Erase Block) size = Block size - 2 * Page size
+        leb_size = block_size - (2 * page_size)
+        
+        # Get rootfs partition size to calculate max LEBs (-c option)
+        rootfs_size = int(d.getVar('RK_PART_ROOTFS_SIZE') or '0')
+        
+        if rootfs_size > 0:
+            # Calculate number of LEBs needed for the partition
+            # Add 5% overhead for UBI metadata and wear-leveling
+            max_lebs = int((rootfs_size / leb_size) * 1.05)
+        else:
+            # Fallback if partition size not available
+            max_lebs = 2048
+            bb.warn("RK_PART_ROOTFS_SIZE not available, using default max LEBs: %d" % max_lebs)
+        
+        # Set UBI/UBIFS parameters
+        # -m: minimum I/O size (page size)
+        # -e: LEB size
+        # -c: max number of LEBs
+        # -x: compression (lzo)
+        mkubifs_args = "-m %d -e %d -c %d -x lzo" % (page_size, leb_size, max_lebs)
+        
+        # -m: minimum I/O size (page size)
+        # -p: physical erase block size (block size)
+        ubinize_args = "-m %d -p %d" % (page_size, block_size)
+        
+        d.setVar('MKUBIFS_ARGS', mkubifs_args)
+        d.setVar('UBINIZE_ARGS', ubinize_args)
+        d.setVar('UBI_VOLNAME', 'rootfs')
+        
+        bb.debug(1, "Calculated UBI parameters:")
+        bb.debug(1, "  MKUBIFS_ARGS = %s" % mkubifs_args)
+        bb.debug(1, "  UBINIZE_ARGS = %s" % ubinize_args)
+        bb.debug(1, "  LEB size: %d bytes" % leb_size)
+        bb.debug(1, "  Max LEBs: %d (for %d bytes partition)" % (max_lebs, rootfs_size))
 }
 
 # Create Rockchip disk image

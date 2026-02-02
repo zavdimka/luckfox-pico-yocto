@@ -9,7 +9,7 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 ## 🎯 Features
 
 - ✅ **Yocto Scarthgap (5.1)** - Latest stable Yocto release
-- ✅ **Multiple Boot Media** - eMMC, SD card, SPI NAND (tested ✓) with SDK-compatible partition layouts
+- ✅ **Multiple Boot Media** - eMMC (tested ✓), SD card (tested ✓), SPI NAND (tested ✓) with SDK-compatible partition layouts
 - ✅ **FIT Boot Images** - Flattened Image Tree format with kernel, DTB, and ramdisk
 - ✅ **U-Boot Integration** - Custom bootloader with environment configuration
 - ✅ **WiFi Drivers** - AIC8800DC wireless support
@@ -17,6 +17,7 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 - ✅ **UBI/UBIFS Support** - Full UBI/UBIFS implementation for SPI NAND flash
 - ✅ **SDK Compatibility** - Partition layout compatible with Luckfox SDK format
 - ✅ **USB Gadget Support** - Serial console (ttyGS0) and Ethernet over USB (RNDIS)
+- ✅ **Self-Contained Build** - Toolchain automatically fetched from git, no external dependencies
 
 ## 📋 Prerequisites
 
@@ -36,21 +37,7 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 
 ## 🚀 Quick Start
 
-### 1. Install Git
-
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y git
-
-# Fedora
-sudo dnf install -y git
-
-# Verify installation
-git --version
-```
-
-### 2. Install Yocto Dependencies
+### 1. Install Yocto Dependencies
 
 #### Ubuntu/Debian
 
@@ -76,25 +63,52 @@ sudo dnf install -y gawk make wget tar bzip2 gzip python3 unzip perl patch \
     zstd lz4 file hostname rpcgen
 ```
 
-### 3. Clone the Repository
+### 2. Clone Yocto Poky and meta-openembedded
 
 ```bash
-# Clone with submodules (includes Yocto Poky and meta-openembedded)
-git clone --recursive https://github.com/zavdimka/luckfox-pico-yocto.git
-cd luckfox-pico-yocto
+# Create workspace directory
+mkdir -p ~/luckfox-workspace/yocto-walnascar
+cd ~/luckfox-workspace/yocto-walnascar
 
-# If you already cloned without --recursive, initialize submodules:
-git submodule update --init --recursive
+# Clone Yocto Poky (Scarthgap 5.1)
+git clone -b scarthgap https://git.yoctoproject.org/poky
+cd poky
+git checkout scarthgap
+cd ..
+
+# Clone meta-openembedded
+git clone -b scarthgap https://github.com/openembedded/meta-openembedded.git
+cd meta-openembedded
+git checkout scarthgap
+cd ../..
+```
+
+### 3. Clone the Luckfox Yocto Layer
+
+```bash
+# Clone this repository
+cd ~/luckfox-workspace
+git clone https://github.com/zavdimka/luckfox-pico-yocto.git
+```
+
+Your directory structure should now look like:
+```
+~/luckfox-workspace/
+├── luckfox-pico-yocto/          # This meta-layer
+└── yocto-walnascar/
+    ├── poky/                     # Yocto Poky (core)
+    └── meta-openembedded/        # Additional OE layers
 ```
 
 ### 4. Initialize Build Environment
 
 ```bash
 # Source the Yocto build environment
+cd ~/luckfox-workspace/luckfox-pico-yocto
 source ../yocto-walnascar/poky/oe-init-build-env ../yocto-walnascar/build-luckfox
 
 # This will create the build directory and configuration files
-# You should now be in the build directory
+# You should now be in ~/luckfox-workspace/yocto-walnascar/build-luckfox
 ```
 
 ### 5. Build Your First Image
@@ -113,29 +127,219 @@ bitbake luckfox-image-minimal
 bitbake luckfox-image-full
 ```
 
-### 6. Flash the Image
+### 6. Deploy the Image
 
 After successful build, images will be in:
 ```
-yocto-walnascar/build-luckfox/tmp/deploy/images/luckfox-pico/
+~/luckfox-workspace/yocto-walnascar/build-luckfox/tmp/deploy/images/<machine-name>/
 ```
 
-#### Flash to SD Card (Linux)
+Where `<machine-name>` is:
+- `luckfox-pico` for eMMC builds
+- `luckfox-pico-sd` for SD card builds
+- `luckfox-pico-spi-nand` for SPI NAND builds
+
+The main image file is: `luckfox-image-minimal-<machine-name>.img`
+
+## 📀 Deployment Guide
+
+### Deploy to SD Card
+
+#### Linux
 
 ```bash
-# Find your SD card device (e.g., /dev/sdX - BE CAREFUL!)
+# Navigate to the images directory
+cd ~/luckfox-workspace/yocto-walnascar/build-luckfox/tmp/deploy/images/luckfox-pico-sd/
+
+# Find your SD card device (BE CAREFUL!)
 lsblk
 
 # Flash the image (replace /dev/sdX with your SD card device)
-sudo dd if=luckfox-image-minimal-luckfox-pico.img of=/dev/sdX bs=4M status=progress
+sudo dd if=luckfox-image-minimal-luckfox-pico-sd.img of=/dev/sdX bs=4M status=progress conv=fsync
 sudo sync
+
+# Safely remove the SD card
+sudo eject /dev/sdX
 ```
 
-#### Flash to eMMC (using Rockchip tools)
+#### Windows
+
+Use [win32diskimager](https://sourceforge.net/projects/win32diskimager/) :
+1. Download and install win32diskimager
+2. Select the `.img` file
+3. Select your SD card
+4. Click "Write"
+
+### Deploy to eMMC/SPI NAND Flash
+
+For eMMC and SPI NAND, you need to use Rockchip `upgrade_tool`. The board must be in **MaskROM** mode.
+
+#### Prerequisites
+
+1. **Install Rockchip upgrade_tool**
+
+   Download from [Luckfox Github](https://github.com/LuckfoxTECH/luckfox-pico/tree/main/tools/windows/SocToolKit/bin/windows):
+   
+   - **Linux**: `upgrade_tool` (Linux version)
+   - **Windows**: `upgrade_tool.exe` (Windows version)
+   
+   Both use the same commands (just add `.exe` on Windows).
+
+2. **Put Board in MaskROM Mode**
+
+   - Power off the board
+   - Short the MaskROM pins (or hold BOOT button if available)
+   - Connect USB cable to PC
+   - Power on the board
+   - Release the short/button after 2 seconds
+
+3. **Verify Connection**
+
+   ```bash
+   # Linux
+   lsusb | grep Rockchip
+   # Should show: Bus XXX Device XXX: ID 2207:110b Fuzhou Rockchip Electronics Company
+   
+   # Check with upgrade_tool
+   sudo upgrade_tool ld  # Linux
+   upgrade_tool.exe ld   # Windows
+   # Should show: Found one MASKROM device
+   ```
+
+#### Standard Flash Procedure
+
+Navigate to your build images directory:
+```bash
+# Linux
+cd ~/luckfox-workspace/yocto-walnascar/build-luckfox/tmp/deploy/images/<machine-name>/
+
+Where `<machine-name>` is `luckfox-pico` (eMMC) or `luckfox-pico-spi-nand` (SPI NAND).
+
+**Step 1: Upload bootloader**
+```bash
+# Linux
+sudo upgrade_tool db download.bin
+
+# Windows
+upgrade_tool.exe db download.bin
+```
+
+The `download.bin` is the MiniLoaderAll bootloader (find in your SDK or build output).
+
+**Step 2: Erase flash (SPI NAND only)**
+
+For **SPI NAND** flash, erase before first flash or after partition changes:
+```bash
+# For 128MB SPI NAND flash
+sudo upgrade_tool EL 0 8000000     # Linux
+upgrade_tool.exe EL 0 8000000      # Windows
+
+# For 256MB SPI NAND flash
+sudo upgrade_tool EL 0 10000000    # Linux
+upgrade_tool.exe EL 0 10000000     # Windows
+```
+
+**Skip this step for eMMC** - erasing eMMC is not necessary and may take a very long time.
+
+**Step 3: Write the image**
+```bash
+# Linux - eMMC
+sudo upgrade_tool wl 0 luckfox-image-minimal-luckfox-pico.img
+
+# Linux - SPI NAND
+sudo upgrade_tool wl 0 luckfox-image-minimal-luckfox-pico-spi-nand.img
+
+# Windows - eMMC
+upgrade_tool.exe wl 0 luckfox-image-minimal-luckfox-pico.img
+
+# Windows - SPI NAND
+upgrade_tool.exe wl 0 luckfox-image-minimal-luckfox-pico-spi-nand.img
+```
+
+**Step 4: Reset the device**
+```bash
+# Linux
+sudo upgrade_tool rd
+
+# Windows
+upgrade_tool.exe rd
+```
+
+The device will reboot automatically.
+
+#### Complete Example - eMMC
 
 ```bash
-# Use Rockchip upgrade_tool or rkdeveloptool
+# Linux
+cd ~/luckfox-workspace/yocto-walnascar/build-luckfox/tmp/deploy/images/luckfox-pico/
+sudo upgrade_tool db download.bin
 sudo upgrade_tool wl 0 luckfox-image-minimal-luckfox-pico.img
+sudo upgrade_tool rd
+
+# Windows
+cd C:\path\to\images\luckfox-pico\
+upgrade_tool.exe db download.bin
+upgrade_tool.exe wl 0 luckfox-image-minimal-luckfox-pico.img
+upgrade_tool.exe rd
+```
+
+#### Complete Example - SPI NAND (256MB)
+
+```bash
+# Linux
+cd ~/luckfox-workspace/yocto-walnascar/build-luckfox/tmp/deploy/images/luckfox-pico-spi-nand/
+sudo upgrade_tool db download.bin
+sudo upgrade_tool EL 0 10000000
+sudo upgrade_tool wl 0 luckfox-image-minimal-luckfox-pico-spi-nand.img
+sudo upgrade_tool rd
+
+# Windows
+cd C:\path\to\images\luckfox-pico-spi-nand\
+upgrade_tool.exe db download.bin
+upgrade_tool.exe EL 0 10000000
+upgrade_tool.exe wl 0 luckfox-image-minimal-luckfox-pico-spi-nand.img
+upgrade_tool.exe rd
+```
+
+### Verify Deployment
+
+After flashing:
+
+1. **Power cycle the board** (disconnect and reconnect power)
+2. **Connect to serial console** (115200 8N1):
+   - USB serial: `/dev/ttyUSB0` (Linux) or `COMx` (Windows)
+   - After boot: `/dev/ttyGS0` (USB gadget serial console)
+3. **Login**: 
+   - Username: `root`
+   - Password: (none - press Enter)
+4. **Check boot**:
+   ```bash
+   # Check kernel version
+   uname -a
+   
+   # Check mounted filesystems
+   mount
+   
+   # Check storage
+   df -h
+   ```
+
+### Serial Console Access
+
+The system provides multiple serial console options:
+
+- **ttyFIQ0**: Debug serial port (hardware UART, 115200 8N1)
+- **ttyGS0**: USB gadget serial console (USB ACM, appears after boot)
+
+To connect via USB gadget serial (after boot):
+```bash
+# Linux
+sudo minicom -D /dev/ttyACM0 -b 115200
+
+# Or using screen
+sudo screen /dev/ttyACM0 115200
+
+# Windows: Use PuTTY, TeraTerm, or similar
 ```
 
 ## 🏗️ Project Structure
@@ -175,7 +379,8 @@ luckfox-pico-yocto/
 │   └── usb-gadget/                    # USB gadget support
 │       └── usb-gadget_1.0.bb          # ACM serial + RNDIS ethernet
 ├── recipes-devtools/
-│   └── toolchain/                     # External toolchain setup
+│   └── toolchain/                     # Rockchip ARM toolchain (auto-fetched from git)
+│       └── arm-rockchip830-toolchain-native.bb  # GCC 8.3.0 + uclibc toolchain
 ├── recipes-extended/
 │   └── xz/                            # XZ compression utilities
 ├── README.md
@@ -189,7 +394,7 @@ luckfox-pico-yocto/
 
 ### Build for Different Boot Media
 
-#### eMMC (default)
+#### eMMC (default) ✅ Tested & Working
 
 ```bash
 # Edit conf/local.conf or use:
@@ -227,8 +432,6 @@ Edit your machine config or `local.conf`:
 # Example: Larger boot partition
 ROCKCHIP_PARTITION_LAYOUT = "32K(env),512K@32K(idblock),256K(uboot),32M(boot),-(rootfs)"
 
-# Example: With OEM and userdata partitions
-ROCKCHIP_PARTITION_LAYOUT = "32K(env),512K@32K(idblock),256K(uboot),32M(boot),-(rootfs)"
 ```
 
 See [README-PARTITIONS.md](README-PARTITIONS.md) for details.
@@ -329,33 +532,11 @@ Ensure you have at least 100GB free space. Clean old builds:
 rm -rf tmp/work/*
 ```
 
-### Git Submodules Not Found
-
-```bash
-git submodule update --init --recursive
-```
-
 ### Python locale errors
 
 ```bash
 sudo locale-gen en_US.UTF-8
 export LC_ALL=en_US.UTF-8
-```
-
-### Fetch failures
-
-```bash
-# Clean downloads and retry
-rm -rf downloads
-bitbake <recipe-name>
-```
-
-### Hash mismatch errors
-
-```bash
-# Clean sstate and rebuild
-bitbake -c cleansstate <recipe-name>
-bitbake <recipe-name>
 ```
 
 ## 🤝 Contributing
@@ -407,10 +588,9 @@ This project is licensed under mixed licenses. See individual recipe files for s
 - [x] Complete disk image creation
 - [x] SDK-compatible partition layouts
 - [x] eMMC boot (tested)
-- [ ] SD card boot (testing needed)
-- [ ] Camera support (ISP drivers)
-- [ ] Hardware video encoding/decoding
-- [ ] Qt/Wayland graphics stack
+- [x] SD card boot (tested)
+- [x] SPI nand boot (tested)
+- [ ] Dual boot
 - [ ] OTA update support
 - [ ] Custom BSP layer separation
 

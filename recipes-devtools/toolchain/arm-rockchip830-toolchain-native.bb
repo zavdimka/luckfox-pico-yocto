@@ -9,6 +9,10 @@ INHIBIT_DEFAULT_DEPS = "1"
 # Remove SPDX creation to avoid circular dependency
 INHERIT:remove = "create-spdx create-spdx-3.0"
 
+# Don't strip ARM binaries with x86 strip tool
+INHIBIT_PACKAGE_STRIP = "1"
+INHIBIT_SYSROOT_STRIP = "1"
+
 # Disable patching since this is a pre-built toolchain
 PATCHTOOL = "patch"
 PATCH_DEPENDS = ""
@@ -19,6 +23,10 @@ SRCREV = "${AUTOREV}"
 S = "${WORKDIR}/git"
 
 inherit native
+
+# Tell sysroot staging to include these directories
+SYSROOT_DIRS += "${bindir}"
+SYSROOT_DIRS += "${prefix}/arm-rockchip830-linux-uclibcgnueabihf"
 
 TOOLCHAIN_PATH = "${S}/tools/linux/toolchain/arm-rockchip830-linux-uclibcgnueabihf"
 
@@ -38,30 +46,19 @@ do_install() {
     # Copy the entire toolchain
     cp -a ${TOOLCHAIN_PATH}/* ${D}${prefix}/arm-rockchip830-linux-uclibcgnueabihf/
     
-    # Create relative symlinks in bindir for the cross-tools
-    # Relative path from bindir to the toolchain bin directory
+    # Create symlinks in bindir for the cross-tools
     cd ${D}${bindir}
     for tool in ${TOOLCHAIN_PATH}/bin/arm-rockchip830-linux-uclibcgnueabihf-*; do
         if [ -f "$tool" ]; then
             toolname=$(basename $tool)
-            ln -s ../arm-rockchip830-linux-uclibcgnueabihf/bin/$toolname $toolname
+            ln -sf ../arm-rockchip830-linux-uclibcgnueabihf/bin/$toolname $toolname
         fi
     done
 }
 
 # Provide environment setup for builds using this toolchain
-export EXTERNAL_TOOLCHAIN = "${STAGING_DIR_NATIVE}${prefix}/arm-rockchip830-linux-uclibcgnueabihf"
-export PATH:prepend = "${EXTERNAL_TOOLCHAIN}/bin:"
-export CC = "arm-rockchip830-linux-uclibcgnueabihf-gcc"
-export CXX = "arm-rockchip830-linux-uclibcgnueabihf-g++"
-export CPP = "arm-rockchip830-linux-uclibcgnueabihf-gcc -E"
-export LD = "arm-rockchip830-linux-uclibcgnueabihf-ld"
-export AR = "arm-rockchip830-linux-uclibcgnueabihf-ar"
-export AS = "arm-rockchip830-linux-uclibcgnueabihf-as"
-export RANLIB = "arm-rockchip830-linux-uclibcgnueabihf-ranlib"
-export OBJCOPY = "arm-rockchip830-linux-uclibcgnueabihf-objcopy"
-export OBJDUMP = "arm-rockchip830-linux-uclibcgnueabihf-objdump"
-export STRIP = "arm-rockchip830-linux-uclibcgnueabihf-strip"
+# These are used at build time when recipes depend on this native package
+EXTERNAL_TOOLCHAIN = "${STAGING_DIR_NATIVE}${prefix}/arm-rockchip830-linux-uclibcgnueabihf"
 
 FILES:${PN} = "${bindir}/* ${prefix}/arm-rockchip830-linux-uclibcgnueabihf/*"
 INSANE_SKIP:${PN} += "already-stripped ldflags file-rdeps arch"

@@ -41,8 +41,7 @@ INSANE_SKIP:kernel-dbg += "buildpaths"
 
 # Override do_configure to use external Rockchip toolchain
 do_configure() {
-    # Use toolchain from SDK directly
-    export PATH="${EXTERNAL_TOOLCHAIN_BIN}:$PATH"
+    # Toolchain is already in PATH via STAGING_BINDIR_NATIVE (symlinks from toolchain-native)
     export CROSS_COMPILE="${EXTERNAL_TOOLCHAIN_PREFIX}"
     export ARCH="arm"
     

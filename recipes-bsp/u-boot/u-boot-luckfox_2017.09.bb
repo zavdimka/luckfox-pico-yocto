@@ -127,7 +127,7 @@ do_compile() {
     unset SOURCE_DATE_EPOCH
     
     # Set up environment for SDK build system
-    export PATH="${EXTERNAL_TOOLCHAIN_BIN}:$PATH"
+    # Toolchain is already in PATH via STAGING_BINDIR_NATIVE
     export CROSS_COMPILE="${EXTERNAL_TOOLCHAIN_PREFIX}"
     export ARCH="arm"
     
