@@ -56,21 +56,6 @@ do_patch:append() {
         shutil.copy2(kbuild_src, kbuild_dst)
 }
 
-# Create a minimal Makefile wrapper in build artifacts if needed
-do_compile:prepend() {
-    if [ ! -f "${STAGING_KERNEL_BUILDDIR}/Makefile" ]; then
-        cat > ${STAGING_KERNEL_BUILDDIR}/Makefile << 'EOFMK'
-# Wrapper Makefile for out-of-tree module builds
-# Forward all targets to the kernel source tree
-MAKEFLAGS += --no-print-directory
-.PHONY: all modules modules_install clean
-
-%:
-	@$(MAKE) -C ${STAGING_KERNEL_DIR} O=${STAGING_KERNEL_BUILDDIR} $@
-EOFMK
-    fi
-}
-
 # Copy Module.symvers from kernel build dir to module source for dependency tracking
 do_compile:append() {
     if [ -f "${STAGING_KERNEL_BUILDDIR}/Module.symvers" ]; then

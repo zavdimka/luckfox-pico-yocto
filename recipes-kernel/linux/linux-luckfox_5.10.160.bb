@@ -94,3 +94,29 @@ do_compile() {
 do_compile_kernelmodules() {
     :
 }
+
+# Ensure the kernel build Makefile is available for module builds
+# The kernel.bbclass stages headers and symbols but not all config files
+do_shared_workdir:append() {
+    # Copy the kernel build Makefile
+    if [ -f "${B}/Makefile" ]; then
+        install -m 0644 ${B}/Makefile ${STAGING_KERNEL_BUILDDIR}/
+    fi
+    
+    # Copy include/config directory with auto.conf and other generated configs
+    if [ -d "${B}/include/config" ]; then
+        install -d ${STAGING_KERNEL_BUILDDIR}/include/config
+        cp -r ${B}/include/config/* ${STAGING_KERNEL_BUILDDIR}/include/config/
+    fi
+    
+    # Copy include/generated directory
+    if [ -d "${B}/include/generated" ]; then
+        install -d ${STAGING_KERNEL_BUILDDIR}/include/generated
+        cp -r ${B}/include/generated/* ${STAGING_KERNEL_BUILDDIR}/include/generated/
+    fi
+    
+    # Copy .config file
+    if [ -f "${B}/.config" ]; then
+        install -m 0644 ${B}/.config ${STAGING_KERNEL_BUILDDIR}/
+    fi
+}
