@@ -70,11 +70,11 @@ sudo dnf install -y gawk make wget tar bzip2 gzip python3 unzip perl patch \
 mkdir -p ~/luckfox-workspace/yocto-walnascar
 cd ~/luckfox-workspace/yocto-walnascar
 
-# Clone Yocto Poky (Walnascar)
-git clone -b walnascar https://github.com/yoctoproject/poky.git
+# Clone Yocto Poky (Scarthgap 5.1)
+git clone -b scarthgap https://github.com/yoctoproject/poky.git
 
-# Clone meta-openembedded
-git clone -b walnascar https://github.com/openembedded/meta-openembedded.git
+# Clone meta-openembedded (Scarthgap)
+git clone -b scarthgap https://github.com/openembedded/meta-openembedded.git
 ```
 
 ### 3. Clone the Luckfox Yocto Layer
