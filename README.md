@@ -71,7 +71,7 @@ mkdir -p ~/luckfox-workspace/yocto-walnascar
 cd ~/luckfox-workspace/yocto-walnascar
 
 # Clone Yocto Poky (Scarthgap 5.1)
-git clone -b scarthgap https://git.yoctoproject.org/poky
+git clone -b scarthgap https://github.com/yoctoproject/poky.git
 
 # Clone meta-openembedded
 git clone -b scarthgap https://github.com/openembedded/meta-openembedded.git
