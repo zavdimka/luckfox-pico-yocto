@@ -8,6 +8,7 @@ PR = "r0"
 
 SRC_URI = "git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main;subpath=sysdrv/source/uboot/u-boot;destsuffix=git/u-boot;name=uboot \
            git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main;subpath=sysdrv/source/uboot/rkbin;destsuffix=git/rkbin;name=rkbin \
+           git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main;subpath=sysdrv/source/uboot/rkbin;destsuffix=git/rkbin;name=rkbin \
            git://github.com/LuckfoxTECH/luckfox-pico.git;protocol=https;branch=main;subpath=sysdrv;destsuffix=git/sysdrv;name=sysdrv \
            file://0001-Luckfox-SDK-modifications-for-RV1106.patch \
 "
@@ -44,16 +45,6 @@ COMPATIBLE_MACHINE = "luckfox-pico"
 do_configure() {
     cd ${S}
     
-    # Clean old build artifacts manually (U-Boot 2017.09 Makefile has issues with directories)
-    find . -name "*.o" -delete
-    find . -name "*.a" -delete
-    find . -name "*.so" -delete
-    rm -rf spl/
-    rm -rf u-boot-*-build/ || true
-    
-    # Clean but don't use mrproper (causes issues with in-tree builds)
-    oe_runmake clean || true
-    
     # Use the patched defconfig from our sources (includes SDK modifications)
     bbnote "Using patched luckfox_rv1106_uboot_defconfig"
     oe_runmake ${UBOOT_MACHINE}
@@ -64,6 +55,18 @@ do_configure() {
 
 # Build using SDK's sysdrv Makefile system (matches SDK build.sh)
 do_compile() {
+    # Force complete clean on every compile to ensure patches are picked up
+    bbnote "Performing deep clean of U-Boot source tree before compile"
+    cd ${S}
+    find . -name "*.o" -delete
+    find . -name "*.a" -delete
+    find . -name "*.so" -delete
+    find . -name "*.cmd" -delete
+    find . -name ".*.cmd" -delete
+    rm -rf spl/ tpl/ || true
+    rm -rf u-boot-*-build/ || true
+    rm -f u-boot u-boot.bin u-boot.img u-boot.map || true
+    
     # Use SDK components from WORKDIR (fetched via SRC_URI)
     SDK_SYSDRV_DIR="${WORKDIR}/git/sysdrv"
     SDK_RKBIN="${WORKDIR}/git/rkbin"
@@ -115,6 +118,8 @@ do_compile() {
     
     # Set up SDK directory structure for the build
     # The sysdrv Makefile expects u-boot source at source/uboot/u-boot
+    # CRITICAL: Remove existing directory and create symlink to our patched source
+    rm -rf ${SDK_SYSDRV_DIR}/source/uboot/u-boot
     mkdir -p ${SDK_SYSDRV_DIR}/source/uboot
     ln -sf ${S} ${SDK_SYSDRV_DIR}/source/uboot/u-boot
     ln -sf ${SDK_RKBIN} ${SDK_SYSDRV_DIR}/source/uboot/rkbin
@@ -133,7 +138,8 @@ do_compile() {
     
     # Get U-Boot config from machine definition (set in luckfox-pico.conf)
     UBOOT_CFG="${RK_UBOOT_DEFCONFIG}"
-    UBOOT_CFG_FRAGMENT="${RK_UBOOT_DEFCONFIG_FRAGMENT}"
+    # Select config fragment based on boot medium (SFC for SPI, eMMC for SD/eMMC)
+    UBOOT_CFG_FRAGMENT="${@'rk-sfc.config' if d.getVar('RK_BOOT_MEDIUM') in ['spi_nand', 'spi_nor'] else 'rk-emmc.config'}"
 
     bbplain "=== U-Boot Build Configuration ==="
     bbplain "Boot medium: ${RK_BOOT_MEDIUM}"

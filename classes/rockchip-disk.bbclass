@@ -142,12 +142,29 @@ IMAGE_CMD:rockchip-disk() {
     ROOTFS_SIZE=$(stat -L -c%s "$ROOTFS_IMG")
     bbplain "  rootfs.$ROOTFS_FS_TYPE: $ROOTFS_SIZE bytes"
     
-    # Calculate disk image size (rootfs offset + rootfs size, rounded up)
-    ROOTFS_OFFSET="${RK_PART_ROOTFS_OFFSET}"
-    DISK_SIZE=`expr $ROOTFS_OFFSET + $ROOTFS_SIZE || true`
+    # Calculate disk image size based on partition layout
+    # For A/B updates: need space for rootfs_a + rootfs_b + userdata (minimum 32MB)
+    # For single boot: rootfs + userdata (minimum 32MB)
+    # Use userdata offset if available, otherwise calculate from last partition
+    
+    if [ -n "${RK_PART_USERDATA_OFFSET}" ]; then
+        # Userdata partition exists, use its offset + minimum size (32MB)
+        USERDATA_MIN_SIZE=`expr 32 \* 1024 \* 1024 || true`  # 32MB minimum
+        DISK_SIZE=`expr ${RK_PART_USERDATA_OFFSET} + $USERDATA_MIN_SIZE || true`
+    elif [ "${RK_ENABLE_AB_UPDATE}" = "1" ] && [ -n "${RK_PART_ROOTFS_B_OFFSET}" ]; then
+        # A/B mode without userdata: account for both rootfs partitions
+        DISK_SIZE=`expr ${RK_PART_ROOTFS_B_OFFSET} + $ROOTFS_SIZE || true`
+    else
+        # Single partition mode: use first rootfs
+        ROOTFS_OFFSET="${RK_PART_ROOTFS_OFFSET}"
+        DISK_SIZE=`expr $ROOTFS_OFFSET + $ROOTFS_SIZE || true`
+    fi
+    
     DISK_SIZE_MB=`expr \( $DISK_SIZE + 1048575 \) / 1048576 || true`
     
-    # Create base disk image (dynamic size based on rootfs)
+    bbnote "Calculated disk image size: ${DISK_SIZE_MB}MB (A/B mode: ${RK_ENABLE_AB_UPDATE})"
+    
+    # Create base disk image (dynamic size based on partition layout)
     bbnote "Creating Rockchip RV1106 disk image (${DISK_SIZE_MB}MB)..."
     dd if=/dev/zero of=${DISK_IMG} bs=1M count=${DISK_SIZE_MB}
     
@@ -158,8 +175,21 @@ IMAGE_CMD:rockchip-disk() {
     ENV_OFFSET="${RK_PART_ENV_OFFSET}"
     IDBLOCK_OFFSET="${RK_PART_IDBLOCK_OFFSET}"
     UBOOT_OFFSET="${RK_PART_UBOOT_OFFSET}"
-    BOOT_OFFSET="${RK_PART_BOOT_OFFSET}"
-    ROOTFS_OFFSET="${RK_PART_ROOTFS_OFFSET}"
+    
+    # Handle A/B partition naming: use boot_a/rootfs_a if available, else boot/rootfs
+    if [ -n "${RK_PART_BOOT_A_OFFSET}" ]; then
+        BOOT_OFFSET="${RK_PART_BOOT_A_OFFSET}"
+        BOOT_PART_SIZE="${RK_PART_BOOT_A_SIZE}"
+    else
+        BOOT_OFFSET="${RK_PART_BOOT_OFFSET}"
+        BOOT_PART_SIZE="${RK_PART_BOOT_SIZE}"
+    fi
+    
+    if [ -n "${RK_PART_ROOTFS_A_OFFSET}" ]; then
+        ROOTFS_OFFSET="${RK_PART_ROOTFS_A_OFFSET}"
+    else
+        ROOTFS_OFFSET="${RK_PART_ROOTFS_OFFSET}"
+    fi
     
     # Convert bytes to 512-byte sectors
     ENV_SECTOR=`expr $ENV_OFFSET / 512 || true`
@@ -185,11 +215,10 @@ IMAGE_CMD:rockchip-disk() {
     UBOOT_IMG_SIZE=$(stat -c%s "$UBOOT_IMG")
     BOOT_SIZE=$(stat -c%s "$BOOT_IMG")
     
-    # Get partition sizes (in bytes)
+    # Get partition sizes (in bytes) - BOOT_PART_SIZE already set above based on A/B mode
     ENV_PART_SIZE="${RK_PART_ENV_SIZE}"
     IDBLOCK_PART_SIZE="${RK_PART_IDBLOCK_SIZE}"
     UBOOT_PART_SIZE="${RK_PART_UBOOT_SIZE}"
-    BOOT_PART_SIZE="${RK_PART_BOOT_SIZE}"
     
     # Check env.img size
     if [ $ENV_SIZE -gt $ENV_PART_SIZE ]; then
@@ -240,6 +269,27 @@ IMAGE_CMD:rockchip-disk() {
     
     bbnote "Writing rootfs partition at sector $ROOTFS_SECTOR"
     dd if=${ROOTFS_IMG} of=${DISK_IMG} seek=$ROOTFS_SECTOR bs=512 conv=notrunc
+    
+    # A/B Update: Duplicate boot and rootfs partitions if enabled
+    if [ "${RK_ENABLE_AB_UPDATE}" = "1" ]; then
+        bbnote "A/B Update enabled - duplicating partitions..."
+        
+        # Duplicate boot_a to boot_b
+        if [ -n "${RK_PART_BOOT_B_OFFSET}" ]; then
+            BOOT_B_SECTOR=`expr ${RK_PART_BOOT_B_OFFSET} / 512 || true`
+            bbnote "Duplicating boot_a to boot_b at sector $BOOT_B_SECTOR"
+            dd if=${BOOT_IMG} of=${DISK_IMG} seek=$BOOT_B_SECTOR bs=512 conv=notrunc
+        fi
+        
+        # Duplicate rootfs_a to rootfs_b
+        if [ -n "${RK_PART_ROOTFS_B_OFFSET}" ]; then
+            ROOTFS_B_SECTOR=`expr ${RK_PART_ROOTFS_B_OFFSET} / 512 || true`
+            bbnote "Duplicating rootfs_a to rootfs_b at sector $ROOTFS_B_SECTOR"
+            dd if=${ROOTFS_IMG} of=${DISK_IMG} seek=$ROOTFS_B_SECTOR bs=512 conv=notrunc
+        fi
+        
+        bbnote "A/B partition duplication complete"
+    fi
     
     bbnote "Rockchip disk image created: ${DISK_IMG} (${DISK_SIZE_MB}MB total)"
     

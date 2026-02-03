@@ -1,0 +1,140 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          userdata-init
+# Required-Start:    
+# Required-Stop:
+# Default-Start:     S
+# Default-Stop:
+# Short-Description: Initialize userdata partition on first boot
+# Description:       Formats and resizes userdata partition to fill available space
+#                    Runs only once on first boot
+### END INIT INFO
+
+USERDATA_MOUNT="/data"
+INIT_FLAG="/var/lib/userdata-initialized"
+
+# Parse blkdevparts from kernel command line to find userdata partition
+detect_userdata_partition() {
+    # Extract blkdevparts from /proc/cmdline
+    # Format: blkdevparts=mmcblk0:32K(env),256K@32K(idblock),256K(uboot),16M(boot),256M(rootfs),-(userdata)
+    BLKDEVPARTS=$(cat /proc/cmdline | tr ' ' '\n' | grep '^blkdevparts=' | sed 's/blkdevparts=//')
+    
+    if [ -z "$BLKDEVPARTS" ]; then
+        echo "ERROR: blkdevparts not found in kernel command line" >&2
+        return 1
+    fi
+    
+    # Extract device name (e.g., mmcblk0)
+    DEVICE=$(echo "$BLKDEVPARTS" | cut -d: -f1)
+    
+    # Extract partition list (everything after first colon)
+    # Use sed instead of cut to handle colons in partition names (e.g., userdata:ext4)
+    PARTITIONS=$(echo "$BLKDEVPARTS" | sed 's/^[^:]*://')
+    
+    # Count partitions until we find userdata
+    # Partition names are in format: size(name) or size@offset(name)
+    PARTITION_NUM=1
+    for part in $(echo "$PARTITIONS" | tr ',' '\n'); do
+        # Extract partition name from parentheses (strip filesystem suffix if present)
+        PART_NAME=$(echo "$part" | sed 's/.*(\([^)]*\)).*/\1/' | cut -d: -f1)
+        
+        # Check if this is the userdata partition
+        if [ "$PART_NAME" = "userdata" ]; then
+            echo "/dev/${DEVICE}p${PARTITION_NUM}"
+            return 0
+        fi
+        
+        PARTITION_NUM=$((PARTITION_NUM + 1))
+    done
+    
+    echo "ERROR: userdata partition not found in blkdevparts" >&2
+    return 1
+}
+
+case "$1" in
+    start)
+        # Check if already initialized
+        if [ -f "$INIT_FLAG" ]; then
+            # Already initialized, just mount if not mounted
+            USERDATA_DEV=$(detect_userdata_partition)
+            if [ -b "$USERDATA_DEV" ] && ! mountpoint -q "$USERDATA_MOUNT"; then
+                echo "Mounting userdata partition $USERDATA_DEV at $USERDATA_MOUNT"
+                mount "$USERDATA_DEV" "$USERDATA_MOUNT" 2>/dev/null
+            fi
+            exit 0
+        fi
+        
+        echo "First boot: Initializing userdata partition..."
+        
+        # Detect userdata partition
+        USERDATA_DEV=$(detect_userdata_partition)
+        
+        if [ ! -b "$USERDATA_DEV" ]; then
+            echo "ERROR: Userdata partition $USERDATA_DEV not found"
+            exit 1
+        fi
+        
+        echo "Userdata partition: $USERDATA_DEV"
+        
+        # Check if partition is already formatted
+        if ! blkid "$USERDATA_DEV" | grep -q "TYPE="; then
+            echo "Formatting userdata partition as ext4..."
+            mkfs.ext4 -F -L userdata "$USERDATA_DEV"
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to format userdata partition"
+                exit 1
+            fi
+        else
+            echo "Userdata partition already formatted, checking filesystem..."
+            # Force check and repair if needed
+            e2fsck -y -f "$USERDATA_DEV" || true
+        fi
+        
+        # Resize partition to maximum available size
+        echo "Resizing userdata partition to maximum size..."
+        resize2fs "$USERDATA_DEV"
+        if [ $? -ne 0 ]; then
+            echo "WARNING: Failed to resize userdata partition (may already be at max size)"
+        fi
+        
+        # Create mount point if it doesn't exist
+        mkdir -p "$USERDATA_MOUNT"
+        
+        # Mount userdata partition
+        echo "Mounting userdata partition at $USERDATA_MOUNT"
+        mount "$USERDATA_DEV" "$USERDATA_MOUNT"
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to mount userdata partition"
+            exit 1
+        fi
+        
+        # Set permissions
+        chmod 755 "$USERDATA_MOUNT"
+        
+        # Create flag file to prevent re-initialization
+        # Store on rootfs, not userdata (so it persists across userdata reformats if needed)
+        mkdir -p /var/lib
+        touch "$INIT_FLAG"
+        
+        echo "Userdata partition initialization complete"
+        ;;
+        
+    stop)
+        # Unmount userdata on shutdown
+        if mountpoint -q "$USERDATA_MOUNT"; then
+            echo "Unmounting userdata partition"
+            umount "$USERDATA_MOUNT"
+        fi
+        ;;
+        
+    restart|reload|force-reload|status)
+        # No action needed
+        ;;
+        
+    *)
+        echo "Usage: $0 {start|stop|restart|reload|force-reload|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

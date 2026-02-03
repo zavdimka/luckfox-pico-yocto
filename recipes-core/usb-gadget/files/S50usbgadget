@@ -86,8 +86,10 @@ setup_rndis()
 	echo "02:11:22:33:44:55" > ${USB_FUNCTIONS_DIR}/rndis.usb0/host_addr
 	echo "02:11:22:33:44:56" > ${USB_FUNCTIONS_DIR}/rndis.usb0/dev_addr
 	
-	# Enable WCEIS for Windows compatibility
-	echo 1 > ${USB_FUNCTIONS_DIR}/rndis.usb0/wceis 2>/dev/null || true
+	# Enable WCEIS for Windows compatibility (optional, may not be supported by all kernels)
+	if [ -f ${USB_FUNCTIONS_DIR}/rndis.usb0/wceis ]; then
+		echo 1 > ${USB_FUNCTIONS_DIR}/rndis.usb0/wceis
+	fi
 	
 	# Link RNDIS function to configuration
 	ln -s ${USB_FUNCTIONS_DIR}/rndis.usb0 ${USB_CONFIG_DIR}/rndis.usb0

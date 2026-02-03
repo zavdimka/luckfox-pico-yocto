@@ -10,13 +10,16 @@ Modern Yocto/OpenEmbedded build system for **Luckfox Pico** boards based on Rock
 
 - ✅ **Yocto Walnascar (5.1)** - Latest stable Yocto release
 - ✅ **Multiple Boot Media** - eMMC (tested ✓), SD card (tested ✓), SPI NAND (tested ✓) with SDK-compatible partition layouts
+- ✅ **A/B Dual Boot System** - Automatic rollback after 3 boot failures with A/B partitions for OTA updates
 - ✅ **FIT Boot Images** - Flattened Image Tree format with kernel, DTB, and ramdisk
-- ✅ **U-Boot Integration** - Custom bootloader with environment configuration
-- ✅ **WiFi Drivers** - AIC8800DC wireless support
+- ✅ **U-Boot Integration** - Custom bootloader with environment configuration and A/B slot management
+- ✅ **WiFi Drivers** - AIC8800DC wireless support with utilities (iw, wpa-supplicant)
 - ✅ **Complete Disk Images** - Ready-to-flash `.img` files for all boot media
 - ✅ **UBI/UBIFS Support** - Full UBI/UBIFS implementation for SPI NAND flash
 - ✅ **SDK Compatibility** - Partition layout compatible with Luckfox SDK format
 - ✅ **USB Gadget Support** - Serial console (ttyGS0) and Ethernet over USB (RNDIS)
+- ✅ **Userdata Partition** - Persistent storage partition with auto-format and resize on first boot
+- ✅ **Python3 Support** - Full Python3 environment in luckfox-image-full
 - ✅ **Self-Contained Build** - Toolchain automatically fetched from git, no external dependencies
 
 ## 📋 Prerequisites
@@ -412,12 +415,17 @@ luckfox-pico-yocto/
 │       └── u-boot-env/                # Environment configuration
 ├── recipes-core/
 │   ├── images/
-│   │   └── luckfox-image-minimal.bb   # Minimal bootable image
+│   │   ├── luckfox-image-minimal.bb   # Minimal bootable image with A/B boot
+│   │   └── luckfox-image-full.bb      # Full image with Python3
 │   ├── base-files/                    # Base system files
 │   ├── sysvinit/                      # Init system configuration
 │   │   └── sysvinit-inittab_%.bbappend  # Serial console support (ttyFIQ0, ttyGS0)
-│   └── usb-gadget/                    # USB gadget support
-│       └── usb-gadget_1.0.bb          # ACM serial + RNDIS ethernet
+│   ├── usb-gadget/                    # USB gadget support
+│   │   └── usb-gadget_1.0.bb          # ACM serial + RNDIS ethernet
+│   ├── ab-boot-success/               # A/B boot success marker
+│   │   └── ab-boot-success_1.0.bb     # Reset boot counter on successful boot
+│   └── userdata-init/                 # Userdata partition initialization
+│       └── userdata-init_1.0.bb       # Auto-format and resize userdata partition
 ├── recipes-devtools/
 │   └── toolchain/                     # Rockchip ARM toolchain (auto-fetched from git)
 │       └── arm-rockchip830-toolchain-native.bb  # GCC 8.3.0 + uclibc toolchain
@@ -569,16 +577,21 @@ Minimal bootable system with:
 - BusyBox userland
 - Basic networking
 - Serial console
-- ~50MB rootfs
+- USB gadget (serial + ethernet)
+- WiFi support (AIC8800DC driver + utilities)
+- A/B dual boot with automatic rollback
+- Userdata partition with auto-format
+- ~60MB rootfs
 
 ### luckfox-image-full
 
 Full-featured system with:
+- Everything from luckfox-image-minimal
+- Python3 environment (core + modules)
 - Development tools (gcc, make, cmake)
-- Python 3
 - Network utilities
 - System administration tools
-- ~200MB rootfs
+- ~250MB rootfs
 
 ## 🐛 Troubleshooting
 
@@ -609,6 +622,7 @@ Contributions are welcome! Please:
 
 ## 📚 Documentation
 
+- [A/B Update System Guide](AB-UPDATE-GUIDE.md) - Dual boot A/B partition system with automatic rollback
 - [Partition Layout System](README-PARTITIONS.md) - SDK-compatible partition configuration
 - [Yocto Project Documentation](https://docs.yoctoproject.org/)
 - [Luckfox Wiki](https://wiki.luckfox.com/)
@@ -648,8 +662,12 @@ This project is licensed under mixed licenses. See individual recipe files for s
 - [x] eMMC boot (tested)
 - [x] SD card boot (tested)
 - [x] SPI nand boot (tested)
-- [ ] Dual boot
-- [ ] OTA update support
+- [x] Dual boot A/B system
+- [x] Automatic boot failure rollback
+- [x] WiFi utilities (iw, wpa-supplicant)
+- [x] Userdata partition with auto-format
+- [x] Python3 environment
+- [ ] OTA update mechanism
 - [ ] Custom BSP layer separation
 
 ---

@@ -1,0 +1,35 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          ab-boot-success
+# Required-Start:    $local_fs
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:
+# Short-Description: Reset A/B boot counter on successful boot
+# Description:       Marks boot as successful by resetting boot_counter to 0
+#                    This prevents automatic rollback to alternate boot slot
+### END INIT INFO
+
+case "$1" in
+    start)
+        # Check if A/B updates are enabled by checking for active_slot variable
+        if fw_printenv active_slot > /dev/null 2>&1; then
+            ACTIVE_SLOT=$(fw_printenv -n active_slot 2>/dev/null || echo "unknown")
+            BOOT_COUNTER=$(fw_printenv -n boot_counter 2>/dev/null || echo "0")
+            
+            if [ "$BOOT_COUNTER" != "0" ]; then
+                echo "A/B Boot: Slot '$ACTIVE_SLOT' booted successfully, resetting boot counter (was $BOOT_COUNTER)"
+                fw_setenv boot_counter 0
+            fi
+        fi
+        ;;
+    stop|restart|reload|force-reload|status)
+        # No action needed
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload|force-reload|status}"
+        exit 1
+        ;;
+esac
+
+exit 0

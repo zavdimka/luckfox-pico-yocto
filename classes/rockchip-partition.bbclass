@@ -75,6 +75,9 @@ def parse_rockchip_partitions(d):
     # Store parsed partitions in datastore
     d.setVar('RK_PARTITIONS_PARSED', str(partitions))
     
+    # Track partition names for A/B detection
+    partition_names = [p['name'] for p in partitions]
+    
     # Export individual partition info for easy access
     for part in partitions:
         var_prefix = f"RK_PART_{part['name'].upper().replace('-', '_')}"
@@ -83,6 +86,23 @@ def parse_rockchip_partitions(d):
         d.setVar(f"{var_prefix}_SIZE_STR", part['size_str'])
         if part['fstype']:
             d.setVar(f"{var_prefix}_FSTYPE", part['fstype'])
+    
+    # A/B Update: Set convenience variables for backward compatibility
+    # If boot_a/boot_b exist, set RK_PART_BOOT_* to point to boot_a
+    # If rootfs_a/rootfs_b exist, set RK_PART_ROOTFS_* to point to rootfs_a
+    if 'boot_a' in partition_names and 'boot_b' in partition_names:
+        d.setVar('RK_PART_BOOT_OFFSET', d.getVar('RK_PART_BOOT_A_OFFSET'))
+        d.setVar('RK_PART_BOOT_SIZE', d.getVar('RK_PART_BOOT_A_SIZE'))
+        d.setVar('RK_PART_BOOT_SIZE_STR', d.getVar('RK_PART_BOOT_A_SIZE_STR'))
+        bb.debug(1, "A/B boot partitions detected: RK_PART_BOOT_* set to boot_a values")
+    
+    if 'rootfs_a' in partition_names and 'rootfs_b' in partition_names:
+        d.setVar('RK_PART_ROOTFS_OFFSET', d.getVar('RK_PART_ROOTFS_A_OFFSET'))
+        d.setVar('RK_PART_ROOTFS_SIZE', d.getVar('RK_PART_ROOTFS_A_SIZE'))
+        d.setVar('RK_PART_ROOTFS_SIZE_STR', d.getVar('RK_PART_ROOTFS_A_SIZE_STR'))
+        if d.getVar('RK_PART_ROOTFS_A_FSTYPE'):
+            d.setVar('RK_PART_ROOTFS_FSTYPE', d.getVar('RK_PART_ROOTFS_A_FSTYPE'))
+        bb.debug(1, "A/B rootfs partitions detected: RK_PART_ROOTFS_* set to rootfs_a values")
 
 # Parse partitions early (before recipes need the data)
 python() {
