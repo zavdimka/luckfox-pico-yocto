@@ -10,7 +10,8 @@ IMAGE_INSTALL:append = " luckfox-users"
 IMAGE_INSTALL:append = " kernel-modules kmod"
 
 # Add USB Gadget support (ACM serial console + RNDIS ethernet)
-IMAGE_INSTALL:append = " usb-gadget"
+# Add USB gadget configuration if machine supports it
+IMAGE_INSTALL:append = "${@bb.utils.contains('MACHINE_FEATURES', 'usbgadget', ' usb-gadget', '', d)}"
 
 # Add WiFi driver modules
 IMAGE_INSTALL:append = " kernel-module-aic8800dc"
