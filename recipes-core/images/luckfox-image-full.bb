@@ -17,7 +17,7 @@ IMAGE_INSTALL:append = "${@bb.utils.contains('MACHINE_FEATURES', 'usbgadget', ' 
 IMAGE_INSTALL:append = " kernel-module-aic8800dc"
 
 # Add WiFi utilities
-IMAGE_INSTALL:append = " iw wpa-supplicant avftp"
+IMAGE_INSTALL:append = " iw wpa-supplicant"
 
 # Add Python3 minimal (core interpreter + essential modules)
 IMAGE_INSTALL:append = " python3-core python3-modules"
